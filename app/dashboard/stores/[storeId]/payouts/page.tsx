@@ -1,65 +1,86 @@
-import { createClient } from '@/lib/supabase/server'
-import { Card, Button, PageHeader, EmptyState } from '@/components/ui'
+'use client'
+
+import { useState, useEffect, use } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { Card, PageHeader, Button, Badge, EmptyState } from '@/components/ui'
+import { DeleteButton } from '@/components/ui/DeleteButton'
 import Link from 'next/link'
 import { Payout } from '@/types'
-import { cn } from '@/lib/utils'
 
-export default async function StorePayoutsPage({ params }: { params: Promise<{ storeId: string }> }) {
-  const { storeId } = await params
-  const supabase = await createClient()
+export default function PayoutsPage({ params }: { params: Promise<{ storeId: string }> }) {
+  const { storeId } = use(params)
+  const supabase = createClient()
+  const [payouts, setPayouts] = useState<Payout[]>([])
+  const [storeName, setStoreName] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  const { data: payouts, error } = await supabase
-    .from('payouts')
-    .select('*')
-    .eq('store_id', storeId)
-    .order('date', { ascending: false })
-
-  if (error) {
-    return <div>Error loading payouts: {error.message}</div>
+  async function load() {
+    setLoading(true)
+    const [{ data: store }, { data }] = await Promise.all([
+      supabase.from('stores').select('name').eq('id', storeId).single(),
+      supabase.from('payouts').select('*').eq('store_id', storeId).order('date', { ascending: false }),
+    ])
+    setStoreName(store?.name ?? '')
+    setPayouts(data ?? [])
+    setLoading(false)
   }
+
+  useEffect(() => { load() }, [storeId])
+
+  async function handleDelete(id: string) {
+    await supabase.from('payouts').delete().eq('id', id)
+    setPayouts(prev => prev.filter(p => p.id !== id))
+  }
+
+  const totalPaid    = payouts.filter(p => p.status === 'paid').reduce((s, p) => s + Number(p.amount), 0)
+  const totalPending = payouts.filter(p => p.status === 'pending').reduce((s, p) => s + Number(p.amount), 0)
 
   return (
     <div>
       <PageHeader
-        title="Payout Management"
-        description="Track distributions and owner equity payments"
-        action={
-          <Link href={`/dashboard/stores/${storeId}/payouts/new`}>
-            <Button size="md">Record Payout</Button>
-          </Link>
-        }
+        title={`${storeName} — Payouts`}
+        description={`Paid: ${formatCurrency(totalPaid)} · Pending: ${formatCurrency(totalPending)}`}
+        action={<Link href={`/dashboard/stores/${storeId}/payouts/new`}><Button size="sm">+ Add payout</Button></Link>}
       />
-
-      {payouts && payouts.length > 0 ? (
-        <Card className="border-slate-200">
+      {loading ? (
+        <div className="flex items-center justify-center py-16">
+          <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : payouts.length === 0 ? (
+        <EmptyState message="No payouts recorded yet."
+          action={<Link href={`/dashboard/stores/${storeId}/payouts/new`}><Button>Add first payout</Button></Link>}
+        />
+      ) : (
+        <Card>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-slate-100 bg-slate-50/50">
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Recipient</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                  <th className="px-6 py-4 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount</th>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Date</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Recipient</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Method</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">Notes</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">Amount</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-50">
-                {payouts.map((payout: Payout) => (
-                  <tr key={payout.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4 text-slate-500 font-medium">{formatDate(payout.date)}</td>
-                    <td className="px-6 py-4 font-bold text-slate-900">{payout.recipient_name}</td>
-                    <td className="px-6 py-4">
-                      <span className={cn(
-                        'px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border',
-                        payout.status === 'paid' 
-                          ? 'bg-emerald-100 text-emerald-700 border-emerald-200' 
-                          : 'bg-amber-100 text-amber-700 border-amber-200'
-                      )}>
-                        {payout.status}
+              <tbody>
+                {payouts.map(payout => (
+                  <tr key={payout.id} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{formatDate(payout.date)}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{payout.recipient_name}</td>
+                    <td className="px-4 py-3 text-gray-500 capitalize">{payout.method}</td>
+                    <td className="px-4 py-3"><Badge label={payout.status} variant={payout.status === 'paid' ? 'green' : 'yellow'} /></td>
+                    <td className="px-4 py-3 text-gray-400 text-xs max-w-xs truncate">{payout.notes ?? '—'}</td>
+                    <td className="px-4 py-3 text-right font-medium text-gray-900 whitespace-nowrap">{formatCurrency(payout.amount)}</td>
+                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                      <span className="inline-flex items-center gap-3">
+                        <Link href={`/dashboard/stores/${storeId}/payouts/${payout.id}/edit`}
+                          className="text-xs text-blue-500 hover:text-blue-700 transition-colors">Edit</Link>
+                        <DeleteButton onConfirm={() => handleDelete(payout.id)} />
                       </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <span className="text-sm font-black text-slate-900">{formatCurrency(payout.amount)}</span>
                     </td>
                   </tr>
                 ))}
@@ -67,15 +88,6 @@ export default async function StorePayoutsPage({ params }: { params: Promise<{ s
             </table>
           </div>
         </Card>
-      ) : (
-        <EmptyState
-          message="No payouts have been recorded for this store yet."
-          action={
-            <Link href={`/dashboard/stores/${storeId}/payouts/new`}>
-              <Button size="lg">Record First Payout</Button>
-            </Link>
-          }
-        />
       )}
     </div>
   )

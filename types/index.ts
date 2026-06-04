@@ -1,11 +1,11 @@
-export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'other'
-export type PayoutStatus = 'pending' | 'paid'
+export type DistributorName = 'budweiser' | 'cdc' | 'heidelberg' | 'glazers' | 'filichia'
+export type DistributorType = 'alcohol' | 'tobacco'
 
 export interface Store {
   id: string
-  owner_id: string
   name: string
   description: string | null
+  owner_id: string
   created_at: string
 }
 
@@ -15,7 +15,7 @@ export interface Sale {
   date: string
   amount: number
   category: string
-  payment_method: PaymentMethod
+  payment_method: 'cash' | 'card' | 'transfer' | 'other'
   notes: string | null
   created_at: string
 }
@@ -25,9 +25,9 @@ export interface Payout {
   store_id: string
   recipient_name: string
   amount: number
-  method: PaymentMethod
+  method: 'cash' | 'card' | 'transfer' | 'other'
   date: string
-  status: PayoutStatus
+  status: 'pending' | 'paid'
   notes: string | null
   created_at: string
 }
@@ -44,10 +44,27 @@ export interface Expense {
   created_at: string
 }
 
-// For dashboard KPIs
-export interface StoreKPIs {
-  totalRevenue: number
-  totalExpenses: number
-  netProfit: number
-  pendingPayouts: number
+export interface DailyLedger {
+  id: string
+  store_id: string
+  date: string
+  sale: number
+  pay_out: number
+  bills: number
+  payroll: number
+  day_savings: number
+  total_savings: number
+  notes: string | null
+  created_at: string
+}
+
+export interface DistributorPurchase {
+  id: string
+  store_id: string
+  date: string
+  distributor: DistributorName
+  type: DistributorType
+  amount: number
+  notes: string | null
+  created_at: string
 }

@@ -32,7 +32,7 @@ export function cn(...inputs: (string | undefined | null | boolean | { [key: str
     .join(' ')
 }
 
-export function exportToCSV(data: any[], filename: string): void {
+export function exportToCSV(data: Record<string, unknown>[], filename: string): void {
   if (!data.length) return
 
   // Filter out internal Supabase fields and ID fields for readability
