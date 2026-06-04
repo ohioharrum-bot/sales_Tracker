@@ -34,7 +34,7 @@ export default function EditPayoutPage({ params }: { params: Promise<{ storeId: 
     e.preventDefault()
     setError(null)
     const result = payoutSchema.safeParse({ ...form, store_id: storeId })
-    if (!result.success) { setError(result.error.errors[0].message); return }
+    if (!result.success) { setError(result.error.issues[0].message); return }
     setLoading(true)
     const { error: updateError } = await supabase.from('payouts').update({
       recipient_name: result.data.recipient_name, amount: result.data.amount,

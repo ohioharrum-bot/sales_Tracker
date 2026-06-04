@@ -38,7 +38,7 @@ export default function EditExpensePage({ params }: { params: Promise<{ storeId:
     e.preventDefault()
     setError(null)
     const result = expenseSchema.safeParse({ ...form, store_id: storeId })
-    if (!result.success) { setError(result.error.errors[0].message); return }
+    if (!result.success) { setError(result.error.issues[0].message); return }
     setLoading(true)
     const { error: updateError } = await supabase.from('expenses').update({
       vendor: result.data.vendor || null, category: result.data.category,

@@ -204,7 +204,7 @@ export default function EditSalePage({ params }: { params: { storeId: string; id
     e.preventDefault()
     setError(null)
     const result = saleSchema.safeParse({ ...form, store_id: storeId })
-    if (!result.success) { setError(result.error.errors[0].message); return }
+    if (!result.success) { setError(result.error.issues[0].message); return }
     setLoading(true)
     const { error: updateError } = await supabase.from('sales').update({
       date: result.data.date, amount: result.data.amount, category: result.data.category,
@@ -373,7 +373,7 @@ export default function EditPayoutPage({ params }: { params: { storeId: string; 
     e.preventDefault()
     setError(null)
     const result = payoutSchema.safeParse({ ...form, store_id: storeId })
-    if (!result.success) { setError(result.error.errors[0].message); return }
+    if (!result.success) { setError(result.error.issues[0].message); return }
     setLoading(true)
     const { error: updateError } = await supabase.from('payouts').update({
       recipient_name: result.data.recipient_name, amount: result.data.amount,
@@ -552,7 +552,7 @@ export default function EditExpensePage({ params }: { params: { storeId: string;
     e.preventDefault()
     setError(null)
     const result = expenseSchema.safeParse({ ...form, store_id: storeId })
-    if (!result.success) { setError(result.error.errors[0].message); return }
+    if (!result.success) { setError(result.error.issues[0].message); return }
     setLoading(true)
     const { error: updateError } = await supabase.from('expenses').update({
       vendor: result.data.vendor || null, category: result.data.category,
@@ -635,7 +635,7 @@ export default function EditLedgerPage({ params }: { params: { storeId: string; 
     e.preventDefault()
     setError(null)
     const result = dailyLedgerSchema.safeParse({ ...form, store_id: storeId })
-    if (!result.success) { setError(result.error.errors[0].message); return }
+    if (!result.success) { setError(result.error.issues[0].message); return }
     setLoading(true)
     const { error: updateError } = await supabase.from('daily_ledger').update({
       date: result.data.date, sale: result.data.sale, pay_out: result.data.pay_out,
@@ -904,7 +904,7 @@ export default function EditDistributorPage({ params }: { params: { storeId: str
     e.preventDefault()
     setError(null)
     const result = distributorPurchaseSchema.safeParse({ ...form, store_id: storeId })
-    if (!result.success) { setError(result.error.errors[0].message); return }
+    if (!result.success) { setError(result.error.issues[0].message); return }
     setLoading(true)
     const { error: updateError } = await supabase.from('distributor_purchases').update({
       date: result.data.date, distributor: result.data.distributor, type: result.data.type,

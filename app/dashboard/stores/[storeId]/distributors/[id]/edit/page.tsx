@@ -48,7 +48,7 @@ export default function EditDistributorPage({ params }: { params: Promise<{ stor
     e.preventDefault()
     setError(null)
     const result = distributorPurchaseSchema.safeParse({ ...form, store_id: storeId })
-    if (!result.success) { setError(result.error.errors[0].message); return }
+    if (!result.success) { setError(result.error.issues[0].message); return }
     setLoading(true)
     const { error: updateError } = await supabase.from('distributor_purchases').update({
       date: result.data.date, distributor: result.data.distributor, type: result.data.type,

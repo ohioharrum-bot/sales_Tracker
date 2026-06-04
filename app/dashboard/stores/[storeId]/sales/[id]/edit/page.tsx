@@ -41,7 +41,7 @@ export default function EditSalePage({ params }: { params: Promise<{ storeId: st
     e.preventDefault()
     setError(null)
     const result = saleSchema.safeParse({ ...form, store_id: storeId })
-    if (!result.success) { setError(result.error.errors[0].message); return }
+    if (!result.success) { setError(result.error.issues[0].message); return }
     setLoading(true)
     const { error: updateError } = await supabase.from('sales').update({
       date: result.data.date, amount: result.data.amount, category: result.data.category,

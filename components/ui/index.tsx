@@ -124,3 +124,7 @@ export const Badge = ({ label, variant = 'gray' }: { label: string; variant?: 'g
     </span>
   )
 }
+
+export const Spinner = ({ className }: { className?: string }) => (
+  <div className={cn('animate-spin rounded-full h-5 w-5 border-2 border-indigo-600 border-t-transparent', className)} />
+)
