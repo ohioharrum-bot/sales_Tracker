@@ -11,6 +11,7 @@ const NAV = [
 ]
 
 const STORE_NAV = [
+  { label: 'Overview',     path: '' },
   { label: 'Sales',        path: 'sales' },
   { label: 'Payouts',      path: 'payouts' },
   { label: 'Expenses',     path: 'expenses' },
@@ -49,11 +50,15 @@ export default function Sidebar({ userEmail }: { userEmail: string }) {
           <div className="pt-4">
             <p className="px-3 text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">Store</p>
             {STORE_NAV.map(item => {
-              const href = `/dashboard/stores/${storeId}/${item.path}`
+              const href = `/dashboard/stores/${storeId}${item.path ? `/${item.path}` : ''}`
+              const isActive = item.path === '' 
+                ? pathname === `/dashboard/stores/${storeId}`
+                : pathname.startsWith(href)
+                
               return (
                 <Link key={href} href={href} className={cn(
                   'flex items-center px-3 py-2 rounded-lg text-sm transition-colors',
-                  pathname.startsWith(href) ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
+                  isActive ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-100'
                 )}>{item.label}</Link>
               )
             })}

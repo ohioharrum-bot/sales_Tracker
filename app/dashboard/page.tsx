@@ -64,9 +64,8 @@ export default async function DashboardPage() {
 
     supabase
       .from('payouts')
-      .select('amount')
-      .in('store_id', storeIds)
-      .eq('status', 'pending'),
+      .select('amount, status, date')
+      .in('store_id', storeIds),
 
     supabase
       .from('sales')
@@ -78,8 +77,14 @@ export default async function DashboardPage() {
 
   const totalRevenue  = (salesRes.data ?? []).reduce((sum, s) => sum + Number(s.amount), 0)
   const totalExpenses = (expensesRes.data ?? []).reduce((sum, e) => sum + Number(e.amount), 0)
-  const netProfit     = totalRevenue - totalExpenses
-  const pendingPayouts = (payoutsRes.data ?? []).reduce((sum, p) => sum + Number(p.amount), 0)
+  
+  const payouts = payoutsRes.data ?? []
+  const pendingPayouts = payouts.filter(p => p.status === 'pending').reduce((sum, p) => sum + Number(p.amount), 0)
+  const paidPayoutsThisMonth = payouts
+    .filter(p => p.status === 'paid' && p.date >= monthStart && p.date <= today)
+    .reduce((sum, p) => sum + Number(p.amount), 0)
+
+  const netProfit = totalRevenue - totalExpenses - paidPayoutsThisMonth
 
   return (
     <div>
@@ -112,7 +117,7 @@ export default async function DashboardPage() {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {stores.map(store => (
-              <Link key={store.id} href={`/dashboard/stores/${store.id}/sales`}>
+              <Link key={store.id} href={`/dashboard/stores/${store.id}`}>
                 <Card className="p-5 hover:border-indigo-300 hover:shadow-lg transition-all cursor-pointer group h-full flex flex-col justify-between border-slate-200">
                   <div>
                     <div className="flex items-center justify-between mb-2">
