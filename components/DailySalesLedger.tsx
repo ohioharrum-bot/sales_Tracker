@@ -1,14 +1,17 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { createClient } from '@/lib/supabase/client';
+import { Spinner } from '@/components/ui';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 interface SaleEntry {
   sale: number; po: number; bill: number; pr: number; cc: number;
   entered: boolean; changeReason: string | null; changedAt: string | null;
+  dbId?: string;
 }
 interface PayoutEntry {
-  date: string; amount: number; cat: string; subtype: string; desc: string;
+  id?: string; date: string; amount: number; cat: string; subtype: string; desc: string;
 }
 interface CategoryDef {
   label: string; color: string; text: string; subs: string[];
@@ -41,7 +44,8 @@ const hasData = (e?: SaleEntry) =>
 const mk = (y: number, m: number) => `${y}-${m}`;
 
 // ── Component ──────────────────────────────────────────────────────────────
-export default function DailySalesLedger() {
+export default function DailySalesLedger({ storeId }: { storeId: string }) {
+  const supabase = createClient();
   const now = new Date();
   const [year, setYear]   = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
@@ -51,6 +55,8 @@ export default function DailySalesLedger() {
   const [payoutStore,  setPayoutStore]  = useState<PayoutStore>({});
   const [categories,   setCategories]   = useState<Record<string, CategoryDef>>(DEFAULT_CATEGORIES);
   const [dist, setDist] = useState<DistValues>({ bud:0, cdc:0, heid:0, glaz:0, fil:0 });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   // Modal state
   const [entryModal,  setEntryModal]  = useState(false);
@@ -73,6 +79,43 @@ export default function DailySalesLedger() {
   const [pfSubtype, setPfSubtype] = useState('');
   const [pfDesc,    setPfDesc]    = useState('');
   const [pfEditIdx, setPfEditIdx] = useState<number|null>(null);
+
+  // ── Data Fetching ──────────────────────────────────────────────────────
+  useEffect(() => {
+    async function loadData() {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { setLoading(false); return; }
+
+      const { data } = await supabase
+        .from('ledger_entries')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (data) {
+        const newSales: SalesStore = {};
+        const newPayouts: PayoutStore = {};
+
+        data.forEach(row => {
+          // Check if this row belongs to the current store
+          if (row.data?.storeId !== storeId) return;
+
+          const key = mk(row.year, row.month - 1);
+          if (row.type === 'sale') {
+            if (!newSales[key]) newSales[key] = {};
+            newSales[key][row.day] = { ...row.data, dbId: row.id, entered: true };
+          } else if (row.type === 'payout') {
+            if (!newPayouts[key]) newPayouts[key] = [];
+            newPayouts[key].push({ ...row.data, id: row.id });
+          }
+        });
+        setSalesStore(newSales);
+        setPayoutStore(newPayouts);
+      }
+      setLoading(false);
+    }
+    loadData();
+  }, [storeId, supabase]);
 
   // ── Derived data ───────────────────────────────────────────────────────
   const getSales   = useCallback(() => salesStore[mk(year, month)]  || {}, [salesStore, year, month]);
@@ -107,7 +150,7 @@ export default function DailySalesLedger() {
     setEfIsEdit(has);
   };
 
-  const saveEntry = () => {
+  const saveEntry = async () => {
     const fields = [efSale, efPo, efBill, efPr, efCc];
     if (fields.some(f => f.trim() === '')) {
       alert('Please enter a value for every field — type 0 where there\'s nothing.');
@@ -117,25 +160,58 @@ export default function DailySalesLedger() {
       alert('Please note a reason for changing an existing entry.');
       return;
     }
+
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setSaving(false); return; }
+
     const existing = getSales()[efDay];
-    const key = mk(year, month);
-    setSalesStore(prev => ({
-      ...prev,
-      [key]: {
-        ...(prev[key] || {}),
-        [efDay]: {
-          sale: parseFloat(efSale) || 0,
-          po:   parseFloat(efPo)   || 0,
-          bill: parseFloat(efBill) || 0,
-          pr:   parseFloat(efPr)   || 0,
-          cc:   parseFloat(efCc)   || 0,
-          entered: true,
-          changeReason: efIsEdit ? efReason : (existing?.changeReason ?? null),
-          changedAt: efIsEdit ? new Date().toLocaleString() : (existing?.changedAt ?? null),
+    const sale = parseFloat(efSale) || 0;
+    const po = parseFloat(efPo) || 0;
+    const bill = parseFloat(efBill) || 0;
+    const pr = parseFloat(efPr) || 0;
+    const cc = parseFloat(efCc) || 0;
+
+    const entryData = {
+      sale, po, bill, pr, cc,
+      changeReason: efIsEdit ? efReason : (existing?.changeReason ?? null),
+      changedAt: efIsEdit ? new Date().toLocaleString() : (existing?.changedAt ?? null),
+      storeId
+    };
+
+    const payload = {
+      user_id: user.id,
+      year,
+      month: month + 1,
+      day: efDay,
+      type: 'sale',
+      data: entryData
+    };
+
+    const { data, error } = await supabase
+      .from('ledger_entries')
+      .upsert(payload, { onConflict: 'user_id, year, month, day, type' })
+      .select()
+      .single();
+
+    if (error) {
+      alert('Error saving entry: ' + error.message);
+    } else {
+      const key = mk(year, month);
+      setSalesStore(prev => ({
+        ...prev,
+        [key]: {
+          ...(prev[key] || {}),
+          [efDay]: {
+            ...entryData,
+            entered: true,
+            dbId: data.id
+          }
         }
-      }
-    }));
-    setEntryModal(false);
+      }));
+      setEntryModal(false);
+    }
+    setSaving(false);
   };
 
   // ── Payout modal ───────────────────────────────────────────────────────
@@ -154,33 +230,87 @@ export default function DailySalesLedger() {
     setPayoutModal(true);
   };
 
-  const savePayout = () => {
+  const savePayout = async () => {
     if (!pfDate) { alert('Please choose a date.'); return; }
     if (!pfAmount.trim()) { alert('Please enter an amount.'); return; }
-    const entry: PayoutEntry = {
-      date: pfDate, amount: parseFloat(pfAmount) || 0,
-      cat: pfCat, subtype: pfSubtype, desc: pfDesc,
+    
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setSaving(false); return; }
+
+    const amount = parseFloat(pfAmount) || 0;
+    const existing = pfEditIdx !== null ? getPayouts()[pfEditIdx] : null;
+
+    const entryData = {
+      date: pfDate,
+      amount,
+      cat: pfCat,
+      subtype: pfSubtype,
+      desc: pfDesc,
+      storeId
     };
-    const key = mk(year, month);
-    setPayoutStore(prev => {
-      const list = [...(prev[key] || [])];
-      if (pfEditIdx !== null) list[pfEditIdx] = entry;
-      else list.push(entry);
-      list.sort((a, b) => a.date.localeCompare(b.date));
-      return { ...prev, [key]: list };
-    });
-    setPayoutModal(false);
+
+    const payload: any = {
+      user_id: user.id,
+      year,
+      month: month + 1,
+      day: null, // Multiple payouts allowed with null day in unique constraint
+      type: 'payout',
+      data: entryData
+    };
+
+    if (existing?.id) payload.id = existing.id;
+
+    const { data, error } = await supabase
+      .from('ledger_entries')
+      .upsert(payload)
+      .select()
+      .single();
+
+    if (error) {
+      alert('Error saving payout: ' + error.message);
+    } else {
+      const entry: PayoutEntry = {
+        ...entryData,
+        id: data.id,
+      };
+      const key = mk(year, month);
+      setPayoutStore(prev => {
+        const list = [...(prev[key] || [])];
+        if (pfEditIdx !== null) list[pfEditIdx] = entry;
+        else list.push(entry);
+        list.sort((a, b) => a.date.localeCompare(b.date));
+        return { ...prev, [key]: list };
+      });
+      setPayoutModal(false);
+    }
+    setSaving(false);
   };
 
-  const deletePayout = (i: number) => {
+  const deletePayout = async (i: number) => {
     const e = getPayouts()[i];
+    if (!e.id) return;
     if (!confirm(`Remove this ${categories[e.cat]?.label || ''} payout of $${fmt(e.amount)}?`)) return;
-    const key = mk(year, month);
-    setPayoutStore(prev => {
-      const list = [...(prev[key] || [])];
-      list.splice(i, 1);
-      return { ...prev, [key]: list };
-    });
+    
+    setSaving(true);
+    const { error } = await supabase.from('ledger_entries').delete().eq('id', e.id);
+    
+    if (error) {
+      alert('Error deleting payout: ' + error.message);
+    } else {
+      const key = mk(year, month);
+      setPayoutStore(prev => {
+        const list = [...(prev[key] || [])];
+        list.splice(i, 1);
+        return { ...prev, [key]: list };
+      });
+    }
+    setSaving(false);
+  };
+
+  const saveDistributions = async () => {
+    // Keeping local for now as not part of the requested ledger_entries schema
+    alert('Distributions functionality currently limited to session state.');
   };
 
   // ── Category helpers ───────────────────────────────────────────────────
@@ -229,7 +359,18 @@ export default function DailySalesLedger() {
   });
 
   // ── Sales render data ──────────────────────────────────────────────────
-  const buildSalesRows = () => {
+  const buildSalesRows = (): {
+    rows: any[];
+    totSale: number;
+    totPO: number;
+    totBill: number;
+    totPR: number;
+    totCC: number;
+    runPayout: number;
+    runSave: number;
+    filled: number;
+    nDays: number;
+  } => {
     const data = getSales();
     const nDays = daysInMonth(year, month);
     let runPayout = 0, runSave = 0, totSale = 0, totPO = 0, totBill = 0, totPR = 0, totCC = 0;
@@ -249,7 +390,7 @@ export default function DailySalesLedger() {
     return { rows, totSale, totPO, totBill, totPR, totCC, runPayout, runSave, filled: Object.keys(data).filter(d => hasData(data[+d])).length, nDays };
   };
 
-  const buildPayoutSummary = () => {
+  const buildPayoutSummary = (): { totals: Record<string, number>; grand: number } => {
     const entries = getPayouts();
     const totals: Record<string, number> = {};
     let grand = 0;
@@ -257,7 +398,7 @@ export default function DailySalesLedger() {
     return { totals, grand };
   };
 
-  const buildTax = () => {
+  const buildTax = (): { payAlc: number; payTob: number; totalAlc: number; totalTob: number; alcTax: number; tobTax: number } => {
     const distAlc = dist.bud + dist.cdc + dist.heid + dist.glaz;
     const distTob = dist.fil;
     let payAlc = 0, payTob = 0;
@@ -323,8 +464,22 @@ export default function DailySalesLedger() {
   const neg = { color:'var(--color-text-danger,#c0392b)' };
   const muted = { color:'var(--color-text-tertiary,#aaa)' };
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Spinner className="h-8 w-8" />
+      </div>
+    );
+  }
+
   return (
     <div style={s.app}>
+      {saving && (
+        <div style={{ position:'fixed', top:20, right:20, zIndex:100, background:'#111', color:'#fff', padding:'8px 16px', borderRadius:8, fontSize:12, display:'flex', alignItems:'center', gap:8, boxShadow:'0 4px 12px rgba(0,0,0,0.1)' }}>
+          <Spinner className="h-3 w-3 border-white" /> Saving...
+        </div>
+      )}
+
       {/* Tabs */}
       <div style={s.tabs}>
         {(['sales','payouts','distributions'] as const).map(t => (
@@ -495,6 +650,9 @@ export default function DailySalesLedger() {
               <span style={s.monthLabel}>{MONTHS[month]} {year}</span>
               <button style={s.navBtn} onClick={() => changeMonth(1)}>›</button>
             </div>
+            <button style={s.addBtn} onClick={saveDistributions} disabled={saving}>
+              {saving ? 'Saving...' : 'Save distributions'}
+            </button>
           </div>
           <div style={s.twoCol}>
             <div style={s.panel}>
@@ -580,7 +738,7 @@ export default function DailySalesLedger() {
             )}
             <div style={s.formActions}>
               <button style={s.btnCancel} onClick={() => setEntryModal(false)}>Cancel</button>
-              <button style={s.btnPrimary} onClick={saveEntry}>Save</button>
+              <button style={s.btnPrimary} onClick={saveEntry} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
             </div>
             <div style={s.hint}>All fields required — enter 0 where there's nothing</div>
           </div>
@@ -622,7 +780,7 @@ export default function DailySalesLedger() {
             </div>
             <div style={s.formActions}>
               <button style={s.btnCancel} onClick={() => setPayoutModal(false)}>Cancel</button>
-              <button style={s.btnPrimary} onClick={savePayout}>Save</button>
+              <button style={s.btnPrimary} onClick={savePayout} disabled={saving}>{saving ? 'Saving...' : 'Save'}</button>
             </div>
             <div style={s.hint}>Press Enter to save</div>
           </div>

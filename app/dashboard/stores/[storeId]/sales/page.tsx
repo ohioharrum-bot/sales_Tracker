@@ -42,9 +42,8 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
   return (
     <div>
       <PageHeader
-        title={`${storeName} — Sales`}
+        title={`${storeName} — Sales History`}
         description={`${sales.length} records · Total: ${formatCurrency(total)}`}
-        action={<Link href={`/dashboard/stores/${storeId}/sales/new`}><Button size="sm">+ Add sale</Button></Link>}
       />
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -52,7 +51,7 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
         </div>
       ) : sales.length === 0 ? (
         <EmptyState message="No sales recorded yet."
-          action={<Link href={`/dashboard/stores/${storeId}/sales/new`}><Button>Add first sale</Button></Link>}
+          action={<Link href={`/dashboard/stores/${storeId}/ledger`}><Button>Go to Ledger</Button></Link>}
         />
       ) : (
         <Card>

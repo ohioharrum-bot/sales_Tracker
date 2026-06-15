@@ -39,11 +39,13 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ storeI
     const [
       { data: sales },
       { data: expenses },
-      { data: payouts }
+      { data: payouts },
+      { data: ledger }
     ] = await Promise.all([
       supabase.from('sales').select('*').eq('store_id', storeId).eq('date', today),
       supabase.from('expenses').select('*').eq('store_id', storeId).eq('date', today),
       supabase.from('payouts').select('*').eq('store_id', storeId).eq('date', today),
+      supabase.from('daily_ledger').select('*').eq('store_id', storeId).eq('date', today).single()
     ])
     
     const combined: Activity[] = [
@@ -51,6 +53,17 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ storeI
       ...(expenses ?? []).map(e => ({ type: 'expense' as const, data: e })),
       ...(payouts ?? []).map(p => ({ type: 'payout' as const, data: p })),
     ]
+
+    // If ledger exists for today, add it as a virtual activity or just use its stats
+    const ledgerSale = ledger ? { type: 'sale' as const, data: { id: 'ledger-sale', amount: ledger.sale, category: 'Ledger Total', date: today, created_at: ledger.created_at, payment_method: 'mixed' } as any } : null
+    const ledgerPayout = ledger && ledger.pay_out > 0 ? { type: 'payout' as const, data: { id: 'ledger-po', amount: ledger.pay_out, recipient_name: 'Ledger P.O', date: today, created_at: ledger.created_at, status: 'paid', method: 'cash' } as any } : null
+    const ledgerBill = ledger && ledger.bills > 0 ? { type: 'expense' as const, data: { id: 'ledger-bill', amount: ledger.bills, category: 'Ledger Bill', date: today, created_at: ledger.created_at } as any } : null
+    const ledgerPayroll = ledger && ledger.payroll > 0 ? { type: 'expense' as const, data: { id: 'ledger-payroll', amount: ledger.payroll, category: 'Ledger Payroll', date: today, created_at: ledger.created_at } as any } : null
+
+    if (ledgerSale) combined.push(ledgerSale)
+    if (ledgerPayout) combined.push(ledgerPayout)
+    if (ledgerBill) combined.push(ledgerBill)
+    if (ledgerPayroll) combined.push(ledgerPayroll)
 
     combined.sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime())
     setActivities(combined)
@@ -108,19 +121,9 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ storeI
 
       {/* Action Strip */}
       <div className="flex gap-2">
-        <Link href={`/dashboard/stores/${storeId}/sales/new`} className="flex-1">
-          <button className="w-full py-3 bg-slate-900 text-white rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-800 transition-colors flex items-center justify-center gap-2">
-            <PlusIcon size={14} /> Sale
-          </button>
-        </Link>
-        <Link href={`/dashboard/stores/${storeId}/expenses/new`} className="flex-1">
-          <button className="w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
-            <PlusIcon size={14} /> Expense
-          </button>
-        </Link>
-        <Link href={`/dashboard/stores/${storeId}/payouts/new`} className="flex-1">
-          <button className="w-full py-3 bg-white border border-slate-200 text-slate-600 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-slate-50 transition-colors flex items-center justify-center gap-2">
-            <PlusIcon size={14} /> Payout
+        <Link href={`/dashboard/stores/${storeId}/ledger`} className="flex-1">
+          <button className="w-full py-4 bg-slate-900 text-white rounded-xl text-sm font-bold uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center justify-center gap-3 active:scale-[0.98]">
+             Open Daily Ledger
           </button>
         </Link>
       </div>

@@ -38,9 +38,8 @@ export default function ExpensesPage({ params }: { params: Promise<{ storeId: st
   return (
     <div>
       <PageHeader
-        title={`${storeName} — Expenses`}
+        title={`${storeName} — Expenses History`}
         description={`${expenses.length} records · Total: ${formatCurrency(total)}`}
-        action={<Link href={`/dashboard/stores/${storeId}/expenses/new`}><Button size="sm">+ Add expense</Button></Link>}
       />
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -48,7 +47,7 @@ export default function ExpensesPage({ params }: { params: Promise<{ storeId: st
         </div>
       ) : expenses.length === 0 ? (
         <EmptyState message="No expenses recorded yet."
-          action={<Link href={`/dashboard/stores/${storeId}/expenses/new`}><Button>Add first expense</Button></Link>}
+          action={<Link href={`/dashboard/stores/${storeId}/ledger`}><Button>Go to Ledger</Button></Link>}
         />
       ) : (
         <Card>

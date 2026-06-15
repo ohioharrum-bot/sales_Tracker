@@ -39,9 +39,8 @@ export default function PayoutsPage({ params }: { params: Promise<{ storeId: str
   return (
     <div>
       <PageHeader
-        title={`${storeName} — Payouts`}
+        title={`${storeName} — Payouts Log`}
         description={`Paid: ${formatCurrency(totalPaid)} · Pending: ${formatCurrency(totalPending)}`}
-        action={<Link href={`/dashboard/stores/${storeId}/payouts/new`}><Button size="sm">+ Add payout</Button></Link>}
       />
       {loading ? (
         <div className="flex items-center justify-center py-16">
@@ -49,7 +48,7 @@ export default function PayoutsPage({ params }: { params: Promise<{ storeId: str
         </div>
       ) : payouts.length === 0 ? (
         <EmptyState message="No payouts recorded yet."
-          action={<Link href={`/dashboard/stores/${storeId}/payouts/new`}><Button>Add first payout</Button></Link>}
+          action={<Link href={`/dashboard/stores/${storeId}/ledger`}><Button>Go to Ledger</Button></Link>}
         />
       ) : (
         <Card>

@@ -1,6 +1,6 @@
-import NewSaleForm from '@/app/sales/newSaleForm'
+import { redirect } from 'next/navigation'
 
 export default async function Page({ params }: { params: Promise<{ storeId: string }> }) {
-  const resolvedParams = await params
-  return <NewSaleForm params={resolvedParams} />
+  const { storeId } = await params
+  redirect(`/dashboard/stores/${storeId}/ledger`)
 }

@@ -39,45 +39,43 @@ export default async function DashboardPage() {
     )
   }
 
-  // Get current month date range
+  // Get date ranges
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
+  const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0]
   const today = now.toISOString().split('T')[0]
 
   const storeIds = stores.map(s => s.id)
 
-  // Fetch aggregated data across all stores for this month
-  const [salesRes, expensesRes, payoutsRes, recentSalesRes] = await Promise.all([
-    supabase
-      .from('sales')
-      .select('amount')
-      .in('store_id', storeIds)
-      .gte('date', monthStart)
-      .lte('date', today),
+  // Fetch aggregated data across all stores
+  const [salesRes, expensesRes, payoutsRes, ledgerRes, yearlySalesRes, yearlyLedgerRes, recentSalesRes] = await Promise.all([
+    // Monthly Sales
+    supabase.from('sales').select('amount').in('store_id', storeIds).gte('date', monthStart).lte('date', today),
+    // Monthly Expenses
+    supabase.from('expenses').select('amount').in('store_id', storeIds).gte('date', monthStart).lte('date', today),
+    // All Payouts (for pending/paid filtering)
+    supabase.from('payouts').select('amount, status, date').in('store_id', storeIds),
+    // Monthly Ledger
+    supabase.from('daily_ledger').select('sale, pay_out, bills, payroll').in('store_id', storeIds).gte('date', monthStart).lte('date', today),
+    
+    // Yearly Sales
+    supabase.from('sales').select('amount').in('store_id', storeIds).gte('date', yearStart).lte('date', today),
+    // Yearly Ledger
+    supabase.from('daily_ledger').select('sale').in('store_id', storeIds).gte('date', yearStart).lte('date', today),
 
-    supabase
-      .from('expenses')
-      .select('amount')
-      .in('store_id', storeIds)
-      .gte('date', monthStart)
-      .lte('date', today),
-
-    supabase
-      .from('payouts')
-      .select('amount, status, date')
-      .in('store_id', storeIds),
-
-    supabase
-      .from('sales')
-      .select('*, stores(name)')
-      .in('store_id', storeIds)
-      .order('created_at', { ascending: false })
-      .limit(5),
+    // Recent Sales
+    supabase.from('sales').select('*, stores(name)').in('store_id', storeIds).order('created_at', { ascending: false }).limit(5),
   ])
 
-  const totalRevenue  = (salesRes.data ?? []).reduce((sum, s) => sum + Number(s.amount), 0)
-  const totalExpenses = (expensesRes.data ?? []).reduce((sum, e) => sum + Number(e.amount), 0)
+  const ledgerRevenue = (ledgerRes.data ?? []).reduce((sum, l) => sum + Number(l.sale), 0)
+  const ledgerExpenses = (ledgerRes.data ?? []).reduce((sum, l) => sum + Number(l.pay_out) + Number(l.bills) + Number(l.payroll), 0)
+
+  const totalRevenue  = (salesRes.data ?? []).reduce((sum, s) => sum + Number(s.amount), 0) + ledgerRevenue
+  const totalExpenses = (expensesRes.data ?? []).reduce((sum, e) => sum + Number(e.amount), 0) + ledgerExpenses
   
+  const yearlyRevenue = (yearlySalesRes.data ?? []).reduce((sum, s) => sum + Number(s.amount), 0) + 
+                       (yearlyLedgerRes.data ?? []).reduce((sum, l) => sum + Number(l.sale), 0)
+
   const payouts = payoutsRes.data ?? []
   const pendingPayouts = payouts.filter(p => p.status === 'pending').reduce((sum, p) => sum + Number(p.amount), 0)
   const paidPayoutsThisMonth = payouts
@@ -93,17 +91,22 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Dashboard</h1>
           <p className="text-sm text-slate-500 font-medium">Overview across all your business locations</p>
         </div>
-        <div className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1.5 rounded-full">
-          Current Month: {new Date().toLocaleString('default', { month: 'long', year: 'numeric' })}
+        <div className="flex gap-2">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-3 py-1.5 rounded-full">
+            {now.getFullYear()} Total: {formatCurrency(yearlyRevenue)}
+          </div>
+          <div className="text-xs font-bold text-indigo-400 uppercase tracking-widest bg-indigo-50 px-3 py-1.5 rounded-full border border-indigo-100">
+            {now.toLocaleString('default', { month: 'long' })}
+          </div>
         </div>
       </div>
 
       {/* KPI grid */}
       <div className="grid grid-cols-1 gap-4 mb-10 sm:grid-cols-2 lg:grid-cols-4">
-        <KPICard title="Revenue"    amount={totalRevenue}    color="blue"   subtitle="Sales this month" />
-        <KPICard title="Expenses"   amount={totalExpenses}   color="red"    subtitle="Costs this month" />
+        <KPICard title="Revenue"    amount={totalRevenue}    color="blue"   subtitle="Total this month" />
+        <KPICard title="Expenses"   amount={totalExpenses}   color="red"    subtitle="Total this month" />
         <KPICard title="Net Profit" amount={netProfit}       color="green"  subtitle="Estimated earnings" />
-        <KPICard title="Pending"    amount={pendingPayouts}  color="yellow" subtitle="Unpaid distributions" />
+        <KPICard title="Pending"    amount={pendingPayouts}  color="yellow" subtitle="Unpaid payouts" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
