@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 const NAV = [
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'Stores',    href: '/dashboard/stores' },
+  { label: 'Ledger',    href: '/ledger' },
 ]
 
 const STORE_NAV = [
