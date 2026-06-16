@@ -4,7 +4,9 @@ import { useState, useEffect, use } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { Card, Button, Badge, EmptyState } from '@/components/ui'
+import { DeleteButton } from '@/components/ui/DeleteButton'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Sale, Expense, Payout } from '@/types'
 
 // Minimalist SVG Icons
@@ -29,6 +31,7 @@ type Activity =
 export default function StoreOverviewPage({ params }: { params: Promise<{ storeId: string }> }) {
   const { storeId } = use(params)
   const supabase = createClient()
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [activities, setActivities] = useState<Activity[]>([])
   
@@ -71,6 +74,16 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ storeI
   }
 
   useEffect(() => { load() }, [storeId])
+
+  async function handleDeleteStore() {
+    const { error } = await supabase.from('stores').delete().eq('id', storeId)
+    if (error) {
+      alert('Error deleting store: ' + error.message)
+      return
+    }
+    router.push('/dashboard')
+    router.refresh()
+  }
 
   const stats = {
     revenue: activities.filter(a => a.type === 'sale').reduce((s, a) => s + Number(a.data.amount), 0),
@@ -179,11 +192,17 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ storeI
       </div>
 
       {/* Footer Navigation - Discrete */}
-      <div className="pt-12 grid grid-cols-2 md:grid-cols-4 gap-4 opacity-60 hover:opacity-100 transition-opacity">
-        <Link href={`/dashboard/stores/${storeId}/sales`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Sales History</Link>
-        <Link href={`/dashboard/stores/${storeId}/expenses`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Expenses</Link>
-        <Link href={`/dashboard/stores/${storeId}/ledger`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Ledger</Link>
-        <Link href={`/dashboard/stores/${storeId}/reports`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Reports</Link>
+      <div className="pt-12 border-t border-slate-100">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 opacity-60 hover:opacity-100 transition-opacity mb-8">
+          <Link href={`/dashboard/stores/${storeId}/sales`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Sales History</Link>
+          <Link href={`/dashboard/stores/${storeId}/expenses`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Expenses</Link>
+          <Link href={`/dashboard/stores/${storeId}/ledger`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Ledger</Link>
+          <Link href={`/dashboard/stores/${storeId}/reports`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Reports</Link>
+        </div>
+
+        <div className="flex justify-center pt-4">
+          <DeleteButton onConfirm={handleDeleteStore} label="Delete Store permanently" />
+        </div>
       </div>
     </div>
   )
