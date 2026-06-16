@@ -2,7 +2,7 @@ import Sidebar from '@/components/ui/Sidebar'
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 
-export default async function DashboardLayout({
+export default async function POSLayout({
   children,
 }: {
   children: React.ReactNode
@@ -15,12 +15,10 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar userEmail={user.email ?? ''} />
-      <main className="flex-1 p-4 sm:p-8 overflow-y-auto">
-        <div className="max-w-7xl mx-auto">
-          {children}
-        </div>
+      <main className="flex-1 min-w-0 overflow-hidden relative">
+        {children}
       </main>
     </div>
   )

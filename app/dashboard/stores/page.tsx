@@ -36,13 +36,13 @@ export default async function StoresPage() {
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {stores.map(store => (
             <Link key={store.id} href={`/dashboard/stores/${store.id}/sales`}>
-              <Card className="p-6 hover:border-indigo-400 hover:shadow-xl transition-all cursor-pointer group h-full flex flex-col justify-between border-slate-200">
+              <Card className="p-6 hover:border-emerald-400 hover:shadow-xl transition-all cursor-pointer group h-full flex flex-col justify-between border-slate-200">
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-400 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                    <div className="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center font-bold text-slate-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
                       {store.name.charAt(0).toUpperCase()}
                     </div>
-                    <span className="text-slate-300 group-hover:text-indigo-400 transition-colors">&rarr;</span>
+                    <span className="text-slate-300 group-hover:text-emerald-400 transition-colors">&rarr;</span>
                   </div>
                   <p className="font-black text-slate-900 text-lg mb-1">{store.name}</p>
                   {store.description && (

@@ -45,7 +45,7 @@ export default function LedgerPage() {
         <p className="text-slate-500 mb-8">You need to create a store before you can use the ledger.</p>
         <a 
           href="/dashboard/stores/new"
-          className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700"
+          className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700"
         >
           Create your first store
         </a>
@@ -70,7 +70,7 @@ export default function LedgerPage() {
           <select 
             value={selectedStoreId || ''} 
             onChange={(e) => setSelectedStoreId(e.target.value)}
-            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 min-w-[200px] shadow-sm"
+            className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 min-w-[200px] shadow-sm"
           >
             {stores.map(store => (
               <option key={store.id} value={store.id}>{store.name}</option>

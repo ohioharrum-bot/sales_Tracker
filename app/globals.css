@@ -1,23 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  /* ZenStore Light Theme Variables */
+  --zen-bg: #ffffff;
+  --zen-card: #ffffff;
+  --zen-accent: #22c55e;
+  --zen-accent-soft: rgba(34, 197, 94, 0.1);
+  --zen-text: #0f172a;
+  --zen-muted: #64748b;
+  --zen-border: #e2e8f0;
+  --zen-glow: rgba(34, 197, 94, 0.08);
+
+  --background: var(--zen-bg);
+  --foreground: var(--zen-text);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  
+  --color-zen-bg: var(--zen-bg);
+  --color-zen-card: var(--zen-card);
+  --color-zen-accent: var(--zen-accent);
+  --color-zen-accent-soft: var(--zen-accent-soft);
+  --color-zen-text: var(--zen-text);
+  --color-zen-muted: var(--zen-muted);
+  --color-zen-border: var(--zen-border);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: 'Gilroy', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  font-family: 'Gilroy', 'Matter', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-/* Custom Scrollbar for Sidebar */
+.zen-shadow {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03), 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.zen-glow {
+  box-shadow: 0 0 40px rgba(34, 197, 94, 0.1);
+}
+
+.zen-border {
+  border: 1px solid var(--zen-border);
+}
+
+/* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 5px;
 }
@@ -27,10 +57,10 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #cbd5e1;
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #94a3b8;
 }

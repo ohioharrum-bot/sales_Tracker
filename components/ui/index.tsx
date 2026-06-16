@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger'; size?: 'sm' | 'md' | 'lg' }>(
   ({ className, variant = 'primary', size = 'md', ...props }, ref) => {
     const variants = {
-      primary: 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm',
+      primary: 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm',
       secondary: 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 shadow-sm',
       danger: 'bg-rose-500 text-white hover:bg-rose-600 shadow-sm',
     }
@@ -17,7 +17,7 @@ export const Button = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttrib
       <button
         ref={ref}
         className={cn(
-          'inline-flex items-center justify-center rounded-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
+          'inline-flex items-center justify-center rounded-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2',
           variants[variant],
           sizes[size],
           className
@@ -42,7 +42,7 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       <input
         ref={ref}
         className={cn(
-          'block w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder-slate-400',
+          'block w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 placeholder-slate-400',
           className
         )}
         {...props}
@@ -59,7 +59,7 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTML
       <textarea
         ref={ref}
         className={cn(
-          'block w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 placeholder-slate-400 min-h-[100px]',
+          'block w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm transition-all focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 placeholder-slate-400 min-h-[100px]',
           className
         )}
         {...props}
@@ -76,7 +76,7 @@ export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttrib
       <select
         ref={ref}
         className={cn(
-          'block w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all appearance-none bg-[url("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20fill%3D%27none%20viewBox%3D%270%200%2020%2020%27%3E%3Cpath%20stroke%3D%27%236B7280%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20stroke-width%3D%271.5%27%20d%3D%27m6%208%204%204%204-4%27%2F%3E%3C%2Fsvg%3E")] bg-[length:1.25rem_1.25rem] bg-[right_0.5rem_center] bg-no-repeat pr-10',
+          'block w-full px-3 py-2.5 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all appearance-none bg-[url("data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%27http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%27%20fill%3D%27none%20viewBox%3D%270%200%2020%2020%27%3E%3Cpath%20stroke%3D%27%236B7280%27%20stroke-linecap%3D%27round%27%20stroke-linejoin%3D%27round%27%20stroke-width%3D%271.5%27%20d%3D%27m6%208%204%204%204-4%27%2F%3E%3C%2Fsvg%3E")] bg-[length:1.25rem_1.25rem] bg-[right_0.5rem_center] bg-no-repeat pr-10',
           className
         )}
         {...props}
@@ -113,7 +113,7 @@ export const EmptyState = ({ message, action }: { message: string; action?: Reac
 export const Badge = ({ label, variant = 'gray' }: { label: string; variant?: 'green' | 'blue' | 'yellow' | 'gray' | 'red' }) => {
   const variants = {
     green: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-    blue: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+    blue: 'bg-emerald-100 text-emerald-700 border-emerald-200',
     yellow: 'bg-amber-100 text-amber-700 border-amber-200',
     gray: 'bg-slate-100 text-slate-700 border-slate-200',
     red: 'bg-rose-100 text-rose-700 border-rose-200',
@@ -126,5 +126,5 @@ export const Badge = ({ label, variant = 'gray' }: { label: string; variant?: 'g
 }
 
 export const Spinner = ({ className }: { className?: string }) => (
-  <div className={cn('animate-spin rounded-full h-5 w-5 border-2 border-indigo-600 border-t-transparent', className)} />
+  <div className={cn('animate-spin rounded-full h-5 w-5 border-2 border-emerald-600 border-t-transparent', className)} />
 )

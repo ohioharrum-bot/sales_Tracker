@@ -99,88 +99,85 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ storeI
   )
 
   return (
-    <div className="max-w-3xl mx-auto space-y-12">
-      {/* Minimal Header */}
-      <section className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-slate-100 pb-8">
+    <div className="max-w-4xl mx-auto space-y-8 sm:space-y-12 pb-20">
+      {/* Header */}
+      <section className="flex flex-col md:flex-row md:items-center justify-between gap-6 sm:gap-8 border-b border-slate-100 pb-10">
         <div>
-          <h2 className="text-3xl font-light text-slate-900 tracking-tight">Daily <span className="font-bold">Summary</span></h2>
-          <p className="text-xs font-medium text-slate-400 uppercase tracking-widest mt-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
+          <h1 className="text-3xl sm:text-4xl font-black text-zen-text tracking-tight mb-2">Daily Summary</h1>
+          <p className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em]">
+            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+          </p>
         </div>
-        <div className="flex items-baseline gap-4">
-          <div className="text-right">
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Today's Net</p>
-            <p className={cn("text-2xl font-black tabular-nums", net >= 0 ? "text-slate-900" : "text-rose-600")}>
-              {formatCurrency(net)}
-            </p>
-          </div>
+        <div className="bg-white p-4 sm:p-6 border border-zen-border rounded-3xl zen-shadow flex flex-col items-start md:items-end">
+          <p className="text-[9px] font-black text-zen-muted uppercase tracking-[0.25em] mb-2">Net Balance</p>
+          <p className={cn("text-2xl sm:text-3xl font-black tabular-nums tracking-tighter", net >= 0 ? "text-zen-accent" : "text-rose-600")}>
+            {formatCurrency(net)}
+          </p>
         </div>
       </section>
 
-      {/* Stats Row - Ultra Thin */}
-      <div className="grid grid-cols-3 gap-8 px-2">
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Revenue</p>
-          <p className="text-sm font-bold text-slate-900">{formatCurrency(stats.revenue)}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Expenses</p>
-          <p className="text-sm font-bold text-slate-900">{formatCurrency(stats.expenses)}</p>
-        </div>
-        <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Payouts</p>
-          <p className="text-sm font-bold text-slate-900">{formatCurrency(stats.payouts)}</p>
-        </div>
+      {/* Stats Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+        {[
+          { label: 'Revenue', val: stats.revenue, color: 'text-emerald-600' },
+          { label: 'Expenses', val: stats.expenses, color: 'text-rose-600' },
+          { label: 'Payouts', val: stats.payouts, color: 'text-zen-accent' },
+        ].map(stat => (
+          <div key={stat.label} className="p-6 bg-white border border-zen-border rounded-2xl zen-shadow group hover:border-zen-accent/30 transition-all">
+            <p className="text-[9px] font-black text-zen-muted uppercase tracking-[0.2em] mb-3">{stat.label}</p>
+            <p className={cn("text-xl font-black tabular-nums tracking-tight", stat.color)}>{formatCurrency(stat.val)}</p>
+          </div>
+        ))}
       </div>
 
       {/* Action Strip */}
-      <div className="flex gap-2">
-        <Link href={`/dashboard/stores/${storeId}/ledger`} className="flex-1">
-          <button className="w-full py-4 bg-slate-900 text-white rounded-xl text-sm font-bold uppercase tracking-[0.2em] hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center justify-center gap-3 active:scale-[0.98]">
-             Open Daily Ledger
+      <div className="flex">
+        <Link href={`/dashboard/stores/${storeId}/ledger`} className="w-full">
+          <button className="w-full py-6 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-slate-800 transition-all shadow-2xl shadow-slate-200 active:scale-[0.99]">
+             Access Daily Ledger
           </button>
         </Link>
       </div>
 
       {/* Activity - List Style */}
-      <div className="space-y-4">
-        <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] mb-6">Chronological Activity</h3>
-        
+      <div className="space-y-6">
+        <h3 className="text-[10px] font-black text-slate-300 uppercase tracking-[0.3em] pl-2">Chronological Feed</h3>
+
         {activities.length === 0 ? (
-          <div className="py-20 text-center border border-dashed border-slate-200 rounded-2xl">
-            <p className="text-xs font-medium text-slate-400">Your notebook is empty for today.</p>
+          <div className="py-24 text-center border-2 border-dashed border-slate-100 rounded-[2.5rem]">
+            <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Feed empty for today</p>
           </div>
         ) : (
-          <div className="divide-y divide-slate-50 border-t border-slate-50">
+          <div className="bg-white border border-zen-border rounded-[2.5rem] zen-shadow overflow-hidden divide-y divide-slate-50">
             {activities.map((activity, i) => (
-              <div key={i} className="py-4 flex items-center justify-between group">
-                <div className="flex items-center gap-4">
+              <div key={i} className="p-6 flex items-center justify-between group hover:bg-slate-50/50 transition-all">
+                <div className="flex items-center gap-6">
                   <div className={cn(
-                    "w-8 h-8 rounded-lg flex items-center justify-center transition-colors",
-                    activity.type === 'sale' ? "bg-slate-50 text-slate-400 group-hover:bg-green-50 group-hover:text-green-600" :
-                    activity.type === 'expense' ? "bg-slate-50 text-slate-400 group-hover:bg-rose-50 group-hover:text-rose-600" : 
-                    "bg-slate-50 text-slate-400 group-hover:bg-blue-50 group-hover:text-blue-600"
+                    "w-12 h-12 rounded-2xl flex items-center justify-center transition-all shadow-sm border border-transparent",
+                    activity.type === 'sale' ? "bg-emerald-50 text-emerald-500 group-hover:border-emerald-100" :
+                    activity.type === 'expense' ? "bg-rose-50 text-rose-500 group-hover:border-rose-100" : 
+                    "bg-emerald-50 text-zen-accent group-hover:border-emerald-100"
                   )}>
-                    {activity.type === 'sale' ? <ShoppingBagIcon size={14} /> :
-                     activity.type === 'expense' ? <CreditCardIcon size={14} /> : <ArrowUpRightIcon size={14} />}
+                    <div className="w-2 h-2 rounded-full bg-current" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-slate-900">
+                    <p className="text-sm font-black text-zen-text mb-1">
                       {activity.type === 'sale' ? (activity.data as Sale).category :
                        activity.type === 'expense' ? (activity.data as Expense).category :
                        (activity.data as Payout).recipient_name}
                     </p>
-                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-tight">
+                    <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">
                       {new Date(activity.data.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • 
                       {activity.type === 'sale' ? (activity.data as Sale).payment_method :
-                       activity.type === 'expense' ? (activity.data as Expense).vendor || 'Expense' :
+                       activity.type === 'expense' ? (activity.data as Expense).vendor || 'Operating Cost' :
                        (activity.data as Payout).method}
                     </p>
                   </div>
                 </div>
                 <div className="text-right">
                   <p className={cn(
-                    "text-sm font-black tabular-nums",
-                    activity.type === 'sale' ? "text-slate-900" : "text-slate-500"
+                    "text-lg font-black tabular-nums tracking-tighter",
+                    activity.type === 'sale' ? "text-zen-text" : "text-rose-500"
                   )}>
                     {activity.type === 'sale' ? '+' : '-'}{formatCurrency(activity.data.amount)}
                   </p>
@@ -191,22 +188,28 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ storeI
         )}
       </div>
 
-      {/* Footer Navigation - Discrete */}
-      <div className="pt-12 border-t border-slate-100">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 opacity-60 hover:opacity-100 transition-opacity mb-8">
-          <Link href={`/dashboard/stores/${storeId}/sales`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Sales History</Link>
-          <Link href={`/dashboard/stores/${storeId}/expenses`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Expenses</Link>
-          <Link href={`/dashboard/stores/${storeId}/ledger`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Ledger</Link>
-          <Link href={`/dashboard/stores/${storeId}/reports`} className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors">Reports</Link>
+      {/* Footer Navigation */}
+      <div className="pt-16 border-t border-slate-100 space-y-12">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 px-4">
+          {[
+            { label: 'Sales History', href: 'sales' },
+            { label: 'Expenses', href: 'expenses' },
+            { label: 'Ledger', href: 'ledger' },
+            { label: 'Reports', href: 'reports' },
+          ].map(link => (
+            <Link key={link.href} href={`/dashboard/stores/${storeId}/${link.href}`} className="text-[9px] font-black text-slate-300 uppercase tracking-[0.25em] hover:text-zen-accent transition-colors">
+              {link.label}
+            </Link>
+          ))}
         </div>
 
-        <div className="flex justify-center pt-4">
-          <DeleteButton onConfirm={handleDeleteStore} label="Delete Store permanently" />
+        <div className="flex justify-center">
+          <DeleteButton onConfirm={handleDeleteStore} label="Terminate Store Identity" />
         </div>
       </div>
     </div>
   )
-}
+  }
 
 function cn(...classes: string[]) {
   return classes.filter(Boolean).join(' ')

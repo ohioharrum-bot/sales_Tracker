@@ -475,7 +475,7 @@ export default function DailySalesLedger({ storeId }: { storeId: string }) {
     navBtn:    { background:'var(--color-background-secondary,#f5f5f5)', border:'0.5px solid var(--color-border-secondary,#ddd)', borderRadius:6, padding:'7px 11px', cursor:'pointer', color:'var(--color-text-primary,#111)', fontSize:13, lineHeight:1 },
     monthLabel:{ fontSize:16, fontWeight:500, minWidth:140, textAlign:'center' as const },
     addBtn:    { background:'var(--color-text-primary,#111)', color:'var(--color-background-primary,#fff)', border:'none', borderRadius:6, padding:'8px 16px', cursor:'pointer', fontSize:13, display:'flex', alignItems:'center', gap:6 },
-    summaryGrid:{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(118px,1fr))', gap:8, marginBottom:'1.25rem' },
+    summaryGrid:{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(140px,1fr))', gap:8, marginBottom:'1.25rem' },
     stat:      { background:'var(--color-background-secondary,#f5f5f5)', border:'0.5px solid var(--color-border-tertiary,#e0e0e0)', borderRadius:6, padding:'10px 12px' },
     statLabel: { fontSize:11, color:'var(--color-text-secondary,#666)', marginBottom:3 },
     statVal:   { fontSize:18, fontWeight:500, color:'var(--color-text-primary,#111)' },

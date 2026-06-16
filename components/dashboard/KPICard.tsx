@@ -1,6 +1,4 @@
-import { Card } from '@/components/ui'
 import { formatCurrency } from '@/lib/utils'
-import { cn } from '@/lib/utils'
 
 interface KPICardProps {
   title: string
@@ -9,27 +7,34 @@ interface KPICardProps {
   color?: 'blue' | 'red' | 'green' | 'yellow'
 }
 
-export const KPICard = ({ title, amount, subtitle, color = 'blue' }: KPICardProps) => {
-  const colorClasses = {
-    blue:   { text: 'text-indigo-600', bg: 'bg-indigo-50',  border: 'border-indigo-100' },
-    red:    { text: 'text-rose-600',   bg: 'bg-rose-50',    border: 'border-rose-100' },
+export function KPICard({ title, amount, subtitle, color = 'green' }: KPICardProps) {
+  const colorMap = {
+    blue:   { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+    red:    { text: 'text-rose-600',   bg: 'bg-rose-50',   border: 'border-rose-100' },
     green:  { text: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    yellow: { text: 'text-amber-600',  bg: 'bg-amber-50',   border: 'border-amber-100' },
+    yellow: { text: 'text-amber-600',  bg: 'bg-amber-50',  border: 'border-amber-100' },
   }
 
-  const current = colorClasses[color]
+  const styles = colorMap[color]
 
   return (
-    <Card className={cn('p-5 border-l-4 transition-all hover:translate-y-[-2px] hover:shadow-md', current.border)}>
-      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-1">{title}</p>
-      <div className="flex items-baseline gap-1">
-        <p className={cn('text-2xl font-black tracking-tight', current.text)}>
-          {formatCurrency(amount)}
-        </p>
+    <div className="p-6 bg-white border border-zen-border rounded-2xl zen-shadow transition-all hover:scale-[1.01]">
+      <div className="flex flex-col gap-1">
+        <p className="text-[10px] font-bold text-zen-muted uppercase tracking-[0.2em]">{title}</p>
+        <div className="flex items-baseline gap-2">
+          <p className={`text-2xl font-black tracking-tight ${styles.text}`}>
+            {formatCurrency(amount)}
+          </p>
+        </div>
+        {subtitle && (
+          <p className="text-[10px] font-medium text-slate-400 mt-2">
+            {subtitle}
+          </p>
+        )}
       </div>
-      {subtitle && (
-        <p className="mt-2 text-[10px] font-semibold text-slate-400 italic">{subtitle}</p>
-      )}
-    </Card>
+      <div className={`mt-4 h-1 w-full rounded-full ${styles.bg}`}>
+        <div className={`h-full rounded-full ${color === 'green' ? 'bg-zen-accent' : styles.text.replace('text-', 'bg-')}`} style={{ width: '40%' }} />
+      </div>
+    </div>
   )
 }

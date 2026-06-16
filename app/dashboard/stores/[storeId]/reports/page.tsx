@@ -125,13 +125,13 @@ export default function ReportsPage({ params }: { params: Promise<{ storeId: str
           )}
 
           {summary && (
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex flex-col items-center gap-1">
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 flex flex-col items-center gap-1">
               {summary.count === 0 ? (
                 <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">No data found in this range</p>
               ) : (
                 <>
-                  <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.2em]">Export Successful</p>
-                  <p className="text-sm font-bold text-indigo-900">
+                  <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.2em]">Export Successful</p>
+                  <p className="text-sm font-bold text-emerald-900">
                     {summary.count} records · {formatCurrency(summary.total)}
                   </p>
                 </>
