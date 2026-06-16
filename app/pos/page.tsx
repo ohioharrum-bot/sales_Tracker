@@ -13,10 +13,115 @@ import {
 } from "recharts";
 
 /* ------------------------------------------------------------------ */
+/*  Interfaces                                                         */
+/* ------------------------------------------------------------------ */
+interface Product {
+  barcode: string;
+  name: string;
+  price: number;
+  cost: number;
+  stock: number;
+  cat: string;
+  quick: boolean;
+  taxable: boolean;
+  reorder: number;
+}
+
+interface CartItem {
+  key: string;
+  barcode: string | null;
+  name: string;
+  price: number;
+  qty: number;
+  taxable: boolean;
+  isCustom: boolean;
+}
+
+interface TransactionItem {
+  name: string;
+  price: number;
+  qty: number;
+  taxable: boolean;
+  barcode: string | null;
+}
+
+interface Transaction {
+  id: string;
+  ts: number;
+  type: string;
+  cashier: string;
+  items: TransactionItem[];
+  subtotal: number;
+  discount: number;
+  tax: number;
+  total: number;
+  method: string;
+  payments?: { method: string; amount: number }[];
+  tendered: number;
+  change: number;
+  refOf?: string;
+  note?: string;
+}
+
+interface Employee {
+  id: string;
+  name: string;
+  role: string;
+  pin: string;
+}
+
+interface Punch {
+  id: string;
+  empId: string;
+  clockIn: number;
+  clockOut: number | null;
+}
+
+interface Settings {
+  storeName: string;
+  taxRate: number;
+  float: number;
+  lastClose: number;
+  activeCashier: string;
+}
+
+interface DayStats {
+  grossSales: number;
+  refundTotal: number;
+  netSales: number;
+  taxColl: number;
+  cashSales: number;
+  cardSales: number;
+  cashRefunds: number;
+  cardRefunds: number;
+  paidIn: number;
+  paidOut: number;
+  items: number;
+  saleCount: number;
+  refundCount: number;
+  noSales: number;
+  manualSales: number;
+  manualCount: number;
+  expectedCash: number;
+  avg: number;
+}
+
+interface ZReport extends DayStats {
+  id: string;
+  openedAt: number;
+  closedAt: number;
+  float: number;
+  countedCash: number;
+  overShort: number;
+  cashierName: string;
+  type: 'z';
+}
+
+/* ------------------------------------------------------------------ */
 /*  Persistent storage (falls back to in-memory if unavailable)        */
 /* ------------------------------------------------------------------ */
 const hasStore = typeof window !== "undefined" && (window as any).storage;
-const mem: any = {};
+const mem: Record<string, any> = {};
 const store = {
   async get(key: string) {
     if (hasStore) {
@@ -35,9 +140,9 @@ const store = {
 /*  Seed data                                                          */
 /* ------------------------------------------------------------------ */
 const CATEGORIES = ["Beverages", "Snacks", "Tobacco", "Grocery", "Other"];
-const CAT_COLOR: any = { Beverages: "#2563eb", Snacks: "#d97706", Tobacco: "#7c3aed", Grocery: "#059669", Other: "#64748b" };
+const CAT_COLOR: Record<string, string> = { Beverages: "#2563eb", Snacks: "#d97706", Tobacco: "#7c3aed", Grocery: "#059669", Other: "#64748b" };
 
-const SEED_PRODUCTS = [
+const SEED_PRODUCTS: Product[] = [
   { barcode: "049000050103", name: "Coca-Cola 20oz",   price: 2.49, cost: 1.10, stock: 48, cat: "Beverages", quick: true,  taxable: true,  reorder: 12 },
   { barcode: "012000001291", name: "Pepsi 20oz",        price: 2.49, cost: 1.10, stock: 36, cat: "Beverages", quick: true,  taxable: true,  reorder: 12 },
   { barcode: "611269991000", name: "Red Bull 8.4oz",    price: 3.29, cost: 1.75, stock: 24, cat: "Beverages", quick: true,  taxable: true,  reorder: 8  },
@@ -58,38 +163,38 @@ const SEED_PRODUCTS = [
   { barcode: "000000000222", name: "Lottery Scratcher", price: 5.00, cost: 4.00, stock: 100,cat: "Other",     quick: true,  taxable: false, reorder: 0  },
 ];
 
-const SEED_EMPLOYEES = [
+const SEED_EMPLOYEES: Employee[] = [
   { id: "e1", name: "Alex Rivera", role: "Cashier", pin: "1234" },
   { id: "e2", name: "Sam Okafor", role: "Manager", pin: "4321" },
 ];
 
-const DEFAULT_SETTINGS = { storeName: "Quick Stop Market", taxRate: 7.25, float: 200, lastClose: 0, activeCashier: "e1" };
+const DEFAULT_SETTINGS: Settings = { storeName: "Quick Stop Market", taxRate: 7.25, float: 200, lastClose: 0, activeCashier: "e1" };
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
-const money = (n: any) => (n < 0 ? "-$" + Math.abs(n).toFixed(2) : "$" + (Number(n) || 0).toFixed(2));
+const money = (n: number) => (n < 0 ? "-$" + Math.abs(n).toFixed(2) : "$" + (Number(n) || 0).toFixed(2));
 const uid = () => Math.random().toString(36).slice(2, 10);
-const dayKey = (d: any) => new Date(d).toISOString().slice(0, 10);
-const itemKey = (it: any) => it.barcode || "c:" + it.name;
+const dayKey = (d: number | Date) => new Date(d).toISOString().slice(0, 10);
+const itemKey = (it: { barcode?: string | null; name: string }) => it.barcode || "c:" + it.name;
 
-function computeDayStats(txs: any[], since: number, float: number) {
+function computeDayStats(txs: Transaction[], since: number, float: number): DayStats {
   let grossSales = 0, refundTotal = 0, taxColl = 0, cashSales = 0, cardSales = 0,
     cashRefunds = 0, cardRefunds = 0, paidIn = 0, paidOut = 0, items = 0,
     saleCount = 0, refundCount = 0, noSales = 0, manualSales = 0, manualCount = 0;
   txs.filter((t) => t.ts > since).forEach((t) => {
     if (t.type === "sale") {
       grossSales += t.total; taxColl += t.tax; saleCount++;
-      items += t.items.reduce((a: any, i: any) => a + i.qty, 0);
+      items += t.items.reduce((a, i) => a + i.qty, 0);
       // manual (open-price) lines have no barcode
-      t.items.forEach((i: any) => { if (i.barcode == null) { manualSales += i.price * i.qty; manualCount += i.qty; } });
+      t.items.forEach((i) => { if (i.barcode == null) { manualSales += i.price * i.qty; manualCount += i.qty; } });
       // attribute cash vs card by individual tender when a split was recorded
       if (Array.isArray(t.payments) && t.payments.length) {
-        t.payments.forEach((p: any) => { if (p.method === "cash") cashSales += p.amount; else cardSales += p.amount; });
+        t.payments.forEach((p) => { if (p.method === "cash") cashSales += p.amount; else cardSales += p.amount; });
       } else if (t.method === "cash") cashSales += t.total; else cardSales += t.total;
     } else if (t.type === "refund") {
       const mag = Math.abs(t.total); refundTotal += mag; taxColl -= Math.abs(t.tax); refundCount++;
-      items -= t.items.reduce((a: any, i: any) => a + i.qty, 0);
+      items -= t.items.reduce((a, i) => a + i.qty, 0);
       if (t.method === "cash") cashRefunds += mag; else cardRefunds += mag;
     } else if (t.type === "paidin") paidIn += t.total;
     else if (t.type === "paidout") paidOut += t.total;
@@ -111,31 +216,31 @@ export default function POS() {
   const [loaded, setLoaded] = useState(false);
   const [view, setView] = useState("register");
 
-  const [products, setProducts] = useState<any[]>([]);
-  const [transactions, setTransactions] = useState<any[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [timesheet, setTimesheet] = useState<any[]>([]);
-  const [zreports, setZreports] = useState<any[]>([]);
-  const [settings, setSettings] = useState<any>(DEFAULT_SETTINGS);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [timesheet, setTimesheet] = useState<Punch[]>([]);
+  const [zreports, setZreports] = useState<ZReport[]>([]);
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
 
-  const [cart, setCart] = useState<any[]>([]);
+  const [cart, setCart] = useState<CartItem[]>([]);
   const [scanInput, setScanInput] = useState("");
   const [activeCat, setActiveCat] = useState("All");
   const [search, setSearch] = useState("");
   const [pendingQty, setPendingQty] = useState(1);
   const [pad, setPad] = useState(0);
   const [padTaxable, setPadTaxable] = useState(true);
-  const [discount, setDiscount] = useState<any>(null);   // {type:'pct'|'amt', value}
+  const [discount, setDiscount] = useState<{ type: 'pct' | 'amt'; value: number } | null>(null);   // {type:'pct'|'amt', value}
   const [ageOk, setAgeOk] = useState(false);
 
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [discountOpen, setDiscountOpen] = useState(false);
   const [returnsOpen, setReturnsOpen] = useState(false);
-  const [ageVerify, setAgeVerify] = useState<any>(null);  // {prod, qty}
-  const [receipt, setReceipt] = useState<any>(null);
+  const [ageVerify, setAgeVerify] = useState<{ prod: Product; qty: number } | null>(null);  // {prod, qty}
+  const [receipt, setReceipt] = useState<Transaction | ZReport | null>(null);
   const [editing, setEditing] = useState<any>(null);
-  const [toast, setToast] = useState<any>(null);
-  const [held, setHeld] = useState<any>(null);
+  const [toast, setToast] = useState<{ msg: string; kind: string; id: string } | null>(null);
+  const [held, setHeld] = useState<{ cart: CartItem[]; discount: any } | null>(null);
 
   const scanRef = useRef<HTMLInputElement>(null);
   const [now, setNow] = useState(Date.now());
@@ -171,7 +276,7 @@ export default function POS() {
   const flash = useCallback((msg: string, kind = "info") => {
     const id = uid();
     setToast({ msg, kind, id });
-    setTimeout(() => setToast((c: any) => (c && c.id === id ? null : c)), 2200);
+    setTimeout(() => setToast((c) => (c && c.id === id ? null : c)), 2200);
   }, []);
 
   const cashierName = useMemo(
@@ -180,7 +285,7 @@ export default function POS() {
   );
 
   /* ----------------------- add to cart -------------------------- */
-  const addProductToCart = useCallback((prod: any, qty: number) => {
+  const addProductToCart = useCallback((prod: Product, qty: number) => {
     setCart((prev) => {
       const existing = prev.find((c) => c.barcode === prod.barcode && !c.isCustom);
       const inCart = existing ? existing.qty : 0;
@@ -194,7 +299,7 @@ export default function POS() {
     });
   }, [flash]);
 
-  const handleAddIntent = useCallback((prod: any) => {
+  const handleAddIntent = useCallback((prod: Product) => {
     const qty = Math.max(1, pendingQty);
     if (prod.cat === "Tobacco" && !ageOk) { setAgeVerify({ prod, qty }); return; }
     addProductToCart(prod, qty);
@@ -253,10 +358,10 @@ export default function POS() {
   }, [cart, discount, settings.taxRate]);
 
   /* complete sale — payments: [{method, amount, given?}], change = cash overpayment */
-  const completeSale = (payments: any[], change: number) => {
+  const completeSale = (payments: { method: string; amount: number; given?: number }[], change: number) => {
     const methods = new Set(payments.map((p) => p.method));
     const tendered = payments.reduce((a, p) => a + (p.given != null ? p.given : p.amount), 0);
-    const tx = {
+    const tx: Transaction = {
       id: uid(), ts: Date.now(), type: "sale", cashier: cashierName,
       items: cart.map((c) => ({ name: c.name, price: c.price, qty: c.qty, taxable: c.taxable, barcode: c.barcode })),
       subtotal: totals.subtotal, discount: totals.discountAmt, tax: totals.tax, total: totals.total,
@@ -273,15 +378,15 @@ export default function POS() {
   };
 
   /* refund */
-  const processRefund = (orig: any, returnItems: any[], method: string) => {
+  const processRefund = (orig: Transaction, returnItems: CartItem[], method: string) => {
     let subtotal = 0, taxable = 0;
     returnItems.forEach((it) => { const line = it.price * it.qty; subtotal += line; if (it.taxable) taxable += line; });
     const tax = taxable * (settings.taxRate / 100);
     const total = subtotal + tax;
-    const tx = {
+    const tx: Transaction = {
       id: uid(), ts: Date.now(), type: "refund", cashier: cashierName, refOf: orig.id,
       items: returnItems.map((it) => ({ name: it.name, price: it.price, qty: it.qty, taxable: it.taxable, barcode: it.barcode })),
-      subtotal: -subtotal, tax: -tax, total: -total, method, tendered: -total, change: 0,
+      subtotal: -subtotal, discount: 0, tax: -tax, total: -total, method, tendered: -total, change: 0,
     };
     setProducts((prev) => prev.map((p) => {
       const back = returnItems.filter((it) => it.barcode === p.barcode).reduce((a, it) => a + it.qty, 0);
@@ -295,20 +400,20 @@ export default function POS() {
   /* cash drawer movements */
   const addCashMovement = (type: string, amount: number, note: string) => {
     if (amount <= 0 && type !== "nosale") return;
-    setTransactions((prev) => [{ id: uid(), ts: Date.now(), type, total: amount, note: note || "", method: "cash", cashier: cashierName, items: [] }, ...prev]);
+    setTransactions((prev) => [{ id: uid(), ts: Date.now(), type, total: amount, note: note || "", method: "cash", cashier: cashierName, items: [], subtotal: 0, discount: 0, tax: 0, tendered: amount, change: 0 }, ...prev]);
     flash(type === "nosale" ? "Drawer opened" : type === "paidin" ? `Paid in ${money(amount)}` : `Paid out ${money(amount)}`, "ok");
   };
 
   /* close day (Z) */
   const closeDay = (countedCash: number, newFloat: number) => {
     const s = computeDayStats(transactions, settings.lastClose, settings.float);
-    const report = {
+    const report: ZReport = {
       id: uid(), openedAt: settings.lastClose, closedAt: Date.now(), float: settings.float,
-      countedCash, overShort: countedCash - s.expectedCash, cashierName, ...s,
+      countedCash, overShort: countedCash - s.expectedCash, cashierName, ...s, type: "z",
     };
     setZreports((prev) => [report, ...prev]);
     setSettings((prev: any) => ({ ...prev, lastClose: Date.now(), float: newFloat }));
-    setReceipt({ ...report, type: "z" });
+    setReceipt(report);
     flash("Day closed — Z report saved", "ok");
   };
 
@@ -527,7 +632,7 @@ function RegisterView(props: any) {
 
         {/* category tabs */}
         <div className="flex gap-2 flex-wrap">
-          {["All", ...categories].map((c) => (
+          {["All", ...categories].map((c: any) => (
             <button key={c} onClick={() => setActiveCat(c)} className="px-3 py-1.5 rounded-full text-sm font-semibold transition-colors"
               style={activeCat === c ? { background: "#14181f", color: "white" } : { background: "white", color: "#475569" }}>{c}</button>
           ))}
@@ -567,7 +672,7 @@ function RegisterView(props: any) {
         <div className="flex-1 min-h-0 overflow-auto px-2 py-1">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-2"><ShoppingCart size={40} /><div className="text-sm">Scan or tap an item to begin</div></div>
-          ) : cart.map((c) => (
+          ) : cart.map((c: any) => (
             <div key={c.key} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-slate-50">
               <div className="flex-1 min-w-0">
                 <div className="text-sm font-semibold truncate">{c.name}</div>
@@ -941,7 +1046,7 @@ function ReceiptModal({ data, storeName, onClose }: any) {
           <div className="flex justify-between font-bold text-base mt-1"><span>{refund ? "Refund" : "Total"}</span><span>{money(data.total)}</span></div>
           <div className="border-t border-dashed border-slate-300 my-2" />
           {!refund && Array.isArray(data.payments) && data.payments.length
-            ? data.payments.map((p, i) => <div key={i} className="flex justify-between"><span className="capitalize">{p.method}</span><span>{money(p.amount)}</span></div>)
+            ? data.payments.map((p: any, i: number) => <div key={i} className="flex justify-between"><span className="capitalize">{p.method}</span><span>{money(p.amount)}</span></div>)
             : <div className="flex justify-between"><span>{data.method === "cash" ? "Cash" : data.method === "card" ? "Card" : "Tendered"}</span><span>{money(data.tendered)}</span></div>}
           {!refund && data.change > 0 && <div className="flex justify-between font-bold"><span>Change</span><span>{money(data.change)}</span></div>}
           <div className="text-center text-xs text-slate-400 mt-3">{refund ? "Refund processed" : "Thank you!"}</div>
@@ -1074,7 +1179,7 @@ function Field({ label, children }: any) {
 /* ================================================================== */
 /*  Staff / Timesheet                                                  */
 /* ================================================================== */
-function fmtDur(ms: any) { const m = Math.floor(ms / 60000); return `${Math.floor(m / 60)}h ${m % 60}m`; }
+function fmtDur(ms: number) { const m = Math.floor(ms / 60000); return `${Math.floor(m / 60)}h ${m % 60}m`; }
 
 function StaffView({ employees, setEmployees, timesheet, clockToggle, clockedIn, now, flash }: any) {
   const [adding, setAdding] = useState(false);
@@ -1082,8 +1187,8 @@ function StaffView({ employees, setEmployees, timesheet, clockToggle, clockedIn,
   const weekAgo = now - 7 * 86400000;
 
   const hoursByEmp = useMemo(() => {
-    const map: any = {};
-    timesheet.forEach((e: any) => {
+    const map: Record<string, number> = {};
+    timesheet.forEach((e: Punch) => {
       if (e.clockIn < weekAgo) return;
       const end = e.clockOut || now;
       map[e.empId] = (map[e.empId] || 0) + (end - e.clockIn);
@@ -1091,12 +1196,12 @@ function StaffView({ employees, setEmployees, timesheet, clockToggle, clockedIn,
     return map;
   }, [timesheet, now, weekAgo]);
 
-  const log = useMemo(() => timesheet.slice().sort((a: any, b: any) => b.clockIn - a.clockIn).slice(0, 25), [timesheet]);
-  const empName = (id: any) => employees.find((e: any) => e.id === id)?.name || "—";
+  const log = useMemo(() => [...timesheet].sort((a: Punch, b: Punch) => b.clockIn - a.clockIn).slice(0, 25), [timesheet]);
+  const empName = (id: string) => employees.find((e: Employee) => e.id === id)?.name || "—";
 
   const addEmp = () => {
     if (!nm.trim()) { flash("Enter a name", "warn"); return; }
-    setEmployees((prev: any) => [...prev, { id: uid(), name: nm.trim(), role, pin: pin.trim() }]);
+    setEmployees((prev: Employee[]) => [...prev, { id: uid(), name: nm.trim(), role, pin: pin.trim() }]);
     setNm(""); setPin(""); setAdding(false); flash("Employee added", "ok");
   };
 
@@ -1109,17 +1214,18 @@ function StaffView({ employees, setEmployees, timesheet, clockToggle, clockedIn,
 
       {adding && (
         <div className="bg-white rounded-xl shadow-sm p-4 flex items-end gap-3 flex-wrap">
-          <Field label="Name"><input value={nm} onChange={(e: any) => setNm(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg outline-none text-sm" autoFocus /></Field>
-          <Field label="Role"><select value={role} onChange={(e: any) => setRole(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg outline-none text-sm"><option>Cashier</option><option>Manager</option><option>Stocker</option></select></Field>
-          <Field label="PIN (optional)"><input value={pin} onChange={(e: any) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} className="px-3 py-2 border border-slate-200 rounded-lg outline-none text-sm font-mono w-28" /></Field>
+          <Field label="Name"><input value={nm} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNm(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg outline-none text-sm" autoFocus /></Field>
+          <Field label="Role"><select value={role} onChange={(e: React.ChangeEvent<HTMLSelectElement>) => setRole(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg outline-none text-sm"><option>Cashier</option><option>Manager</option><option>Stocker</option></select></Field>
+          <Field label="PIN (optional)"><input value={pin} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} className="px-3 py-2 border border-slate-200 rounded-lg outline-none text-sm font-mono w-28" /></Field>
           <button onClick={addEmp} className="px-4 py-2 rounded-lg text-white font-semibold text-sm" style={{ background: "#14181f" }}>Save</button>
         </div>
       )}
 
       {/* employee cards */}
       <div className="grid grid-cols-3 gap-3">
-        {employees.map((e: any) => {
+        {employees.map((e: Employee) => {
           const on = clockedIn.has(e.id);
+          const activePunch = timesheet.find((t: Punch) => t.empId === e.id && !t.clockOut);
           return (
             <div key={e.id} className="bg-white rounded-xl shadow-sm p-4">
               <div className="flex items-start justify-between">
@@ -1132,7 +1238,7 @@ function StaffView({ employees, setEmployees, timesheet, clockToggle, clockedIn,
                   {on ? <><LogOut size={15} /> Clock Out</> : <><LogIn size={15} /> Clock In</>}
                 </button>
               </div>
-              {on && <div className="mt-2 text-xs text-emerald-600 font-semibold">On the clock since {new Date(timesheet.find((t) => t.empId === e.id && !t.clockOut).clockIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>}
+              {on && activePunch && <div className="mt-2 text-xs text-emerald-600 font-semibold">On the clock since {new Date(activePunch.clockIn).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>}
             </div>
           );
         })}
@@ -1144,7 +1250,7 @@ function StaffView({ employees, setEmployees, timesheet, clockToggle, clockedIn,
         {log.length === 0 ? <div className="text-center text-slate-400 text-sm py-8">No punches yet.</div> : (
           <table className="w-full text-sm">
             <thead><tr className="text-left text-xs uppercase tracking-wide text-slate-400" style={{ background: "#f8fafc" }}><th className="px-4 py-2.5 font-semibold">Employee</th><th className="px-3 py-2.5 font-semibold">Date</th><th className="px-3 py-2.5 font-semibold">In</th><th className="px-3 py-2.5 font-semibold">Out</th><th className="px-3 py-2.5 font-semibold text-right">Duration</th></tr></thead>
-            <tbody>{log.map((e: any) => (
+            <tbody>{log.map((e: Punch) => (
               <tr key={e.id} className="border-t border-slate-50">
                 <td className="px-4 py-2 font-semibold">{empName(e.empId)}</td>
                 <td className="px-3 py-2 text-slate-500">{new Date(e.clockIn).toLocaleDateString([], { month: "short", day: "numeric" })}</td>
@@ -1165,28 +1271,28 @@ function StaffView({ employees, setEmployees, timesheet, clockToggle, clockedIn,
 /* ================================================================== */
 function ReportsView({ transactions, lowStock, settings, setSettings, onReprint, onRefund }: any) {
   const today = dayKey(Date.now());
-  const todayTx = transactions.filter((t: any) => t.type === "sale" && dayKey(t.ts) === today);
+  const todayTx = transactions.filter((t: Transaction) => t.type === "sale" && dayKey(t.ts) === today);
   const stats = useMemo(() => {
-    const revenue = todayTx.reduce((a, t) => a + t.total, 0);
-    const items = todayTx.reduce((a, t) => a + t.items.reduce((s: any, i: any) => s + i.qty, 0), 0);
+    const revenue = todayTx.reduce((a: number, t: Transaction) => a + t.total, 0);
+    const items = todayTx.reduce((a: number, t: Transaction) => a + t.items.reduce((s: number, i: TransactionItem) => s + i.qty, 0), 0);
     return { revenue, count: todayTx.length, items, avg: todayTx.length ? revenue / todayTx.length : 0 };
   }, [todayTx]);
 
   const chartData = useMemo(() => {
     const days = [];
     for (let i = 6; i >= 0; i--) { const d = new Date(); d.setDate(d.getDate() - i); const key = dayKey(d);
-      const sum = transactions.filter((t: any) => t.type === "sale" && dayKey(t.ts) === key).reduce((a: any, t: any) => a + t.total, 0);
+      const sum = transactions.filter((t: Transaction) => t.type === "sale" && dayKey(t.ts) === key).reduce((a: number, t: Transaction) => a + t.total, 0);
       days.push({ day: d.toLocaleDateString(undefined, { weekday: "short" }), sales: Math.round(sum * 100) / 100 }); }
     return days;
   }, [transactions]);
 
   const topSellers = useMemo(() => {
-    const map: any = {};
-    transactions.filter((t: any) => t.type === "sale").forEach((t: any) => t.items.forEach((i: any) => { if (!map[i.name]) map[i.name] = { name: i.name, qty: 0, rev: 0 }; map[i.name].qty += i.qty; map[i.name].rev += i.price * i.qty; }));
+    const map: Record<string, { name: string; qty: number; rev: number }> = {};
+    transactions.filter((t: Transaction) => t.type === "sale").forEach((t: Transaction) => t.items.forEach((i: TransactionItem) => { if (!map[i.name]) map[i.name] = { name: i.name, qty: 0, rev: 0 }; map[i.name].qty += i.qty; map[i.name].rev += i.price * i.qty; }));
     return Object.values(map).sort((a: any, b: any) => b.qty - a.qty).slice(0, 6);
   }, [transactions]);
 
-  const recent = transactions.filter((t: any) => t.type === "sale" || t.type === "refund").slice(0, 14);
+  const recent = transactions.filter((t: Transaction) => t.type === "sale" || t.type === "refund").slice(0, 14);
 
   return (
     <div className="h-full overflow-auto p-4"><div className="max-w-5xl mx-auto space-y-4">
@@ -1220,13 +1326,13 @@ function ReportsView({ transactions, lowStock, settings, setSettings, onReprint,
 
       <div className="bg-white rounded-xl shadow-sm p-4"><div className="text-sm font-bold mb-3">Recent Transactions</div>
         {recent.length === 0 ? <div className="text-sm text-slate-400 py-8 text-center">No transactions yet.</div> : (
-          <div className="divide-y divide-slate-50">{recent.map((t: any) => {
+          <div className="divide-y divide-slate-50">{recent.map((t: Transaction) => {
             const refund = t.type === "refund";
             return (
               <div key={t.id} className="flex items-center gap-3 py-2 text-sm">
                 <span className="font-mono text-xs w-16" style={{ color: refund ? "#dc2626" : "#94a3b8" }}>{refund ? "RFND" : "#" + t.id.slice(0, 4).toUpperCase()}</span>
                 <span className="text-slate-500 w-32">{new Date(t.ts).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}</span>
-                <span className="flex-1 text-slate-400 truncate">{t.items.reduce((a: any, i: any) => a + i.qty, 0)} items · {t.method} · {t.cashier}</span>
+                <span className="flex-1 text-slate-400 truncate">{t.items.reduce((a: number, i: TransactionItem) => a + i.qty, 0)} items · {t.method} · {t.cashier}</span>
                 <span className="font-mono font-bold w-20 text-right" style={refund ? { color: "#dc2626" } : {}}>{money(t.total)}</span>
                 <button onClick={() => onReprint(t)} title="Reprint receipt" className="p-1.5 rounded-md text-slate-400 hover:bg-slate-100"><Printer size={15} /></button>
               </div>
@@ -1243,7 +1349,7 @@ function Stat({ label, value, icon: Icon, color }: any) {
 /* ================================================================== */
 /*  End of Day                                                         */
 /* ================================================================== */
-function EndOfDayView({ transactions, settings, zreports, onCash, onCloseDay, onView, now }: any) {
+function EndOfDayView({ transactions, settings, zreports, onCash, onCloseDay, onView, now }: { transactions: Transaction[], settings: Settings, zreports: ZReport[], onCash: any, onCloseDay: any, onView: any, now: number }) {
   const s = useMemo(() => computeDayStats(transactions, settings.lastClose, settings.float), [transactions, settings.lastClose, settings.float]);
   const [cashMove, setCashMove] = useState<any>(null);  // 'paidin' | 'paidout'
   const [closing, setClosing] = useState(false);
@@ -1301,7 +1407,7 @@ function EndOfDayView({ transactions, settings, zreports, onCash, onCloseDay, on
 
       {zreports.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-4"><div className="text-sm font-bold mb-3 flex items-center gap-2"><Calendar size={16} className="text-slate-400" /> Past Z Reports</div>
-          <div className="divide-y divide-slate-50">{zreports.slice(0, 10).map((z) => (
+          <div className="divide-y divide-slate-50">{zreports.slice(0, 10).map((z: ZReport) => (
             <button key={z.id} onClick={() => onView(z)} className="w-full flex items-center gap-3 py-2 text-sm hover:bg-slate-50 rounded-lg px-2 text-left">
               <span className="font-mono text-xs text-slate-400 w-16">#{z.id.slice(0, 6).toUpperCase()}</span>
               <span className="text-slate-500 flex-1">{new Date(z.closedAt).toLocaleString()}</span>
