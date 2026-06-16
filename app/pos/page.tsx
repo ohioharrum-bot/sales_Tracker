@@ -514,7 +514,7 @@ function RegisterView(props: any) {
             <button onClick={() => setPendingQty((q: any) => Math.max(1, q - 1))} className="w-8 h-8 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Minus size={15} /></button>
             <input value={pendingQty}
               onChange={(e) => setPendingQty(Math.max(1, Math.min(999, parseInt(e.target.value.replace(/\D/g, "")) || 1)))}
-              onFocus={(e) => e.target.select()} onKeyDown={(e) => { if (e.key === "Enter") e.target.blur(); }}
+              onFocus={(e) => e.currentTarget.select()} onKeyDown={(e) => { if (e.key === "Enter") e.currentTarget.blur(); }}
               className="w-12 text-center font-mono font-bold text-lg outline-none" style={{ color: pendingQty > 1 ? "#d97706" : "#1e293b" }} />
             <button onClick={() => setPendingQty((q: any) => Math.min(999, q + 1))} className="w-8 h-8 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Plus size={15} /></button>
           </div>
