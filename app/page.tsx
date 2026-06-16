@@ -6,7 +6,7 @@ import { Button } from '@/components/ui';
 
 // ─── Components ───────────────────────────────────────────────────────────
 
-import { ShoppingCart } from 'lucide-react';
+import { ShoppingCart, Menu, X } from 'lucide-react';
 
 const Nav = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
