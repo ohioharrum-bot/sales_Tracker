@@ -841,7 +841,9 @@ function ProductEditor({ product, categories, onCancel, onSave, onDelete }: any)
   const [f, setF] = useState(product || {
     barcode: "", name: "", price: 0, cost: 0, stock: 0, cat: "Snacks", quick: false, taxable: true, reorder: 5,
   });
-  const set = (k: string, v: any) => setF((p) => ({ ...p, [k]: v }));
+  const set = (k: string, v: any) => setF((p: any) => ({ ...p, [k]: v }));
+
+
   const num = (v: any) => (v === "" ? 0 : parseFloat(v) || 0);
   const valid = f.name.trim() && f.barcode.trim();
 
@@ -899,7 +901,7 @@ function ProductEditor({ product, categories, onCancel, onSave, onDelete }: any)
           <div className="flex gap-2">
             <button onClick={onCancel} className="px-4 py-2.5 rounded-lg font-semibold text-sm text-slate-600 hover:bg-slate-100">Cancel</button>
             <button onClick={() => valid && onSave(f)} disabled={!valid}
-              className="px-5 py-2.5 rounded-lg text-white font-semibold text-sm disabled:opacity-40" style={{ background: "#059669" }}>
+              className="px-5 py-2.5 rounded-lg text-white font-semibold text-sm disabled:opacity-40 bg-emerald-600">
               Save
             </button>
           </div>
@@ -924,11 +926,11 @@ function Field({ label, children }: any) {
 /* ================================================================== */
 function ReportsView({ transactions, products, lowStock, settings, setSettings }: any) {
   const today = todayKey(Date.now());
-  const todayTx = transactions.filter((t: any) => todayKey(t.ts) === today);
+  const todayTx = transactions.filter((t) => todayKey(t.ts) === today);
 
   const stats = useMemo(() => {
-    const revenue = todayTx.reduce((a: number, t: any) => a + t.total, 0);
-    const items = todayTx.reduce((a: number, t: any) => a + t.items.reduce((s: number, i: any) => s + i.qty, 0), 0);
+    const revenue = todayTx.reduce((a, t) => a + t.total, 0);
+    const items = todayTx.reduce((a, t) => a + t.items.reduce((s: number, i: any) => s + i.qty, 0), 0);
     return {
       revenue, count: todayTx.length, items,
       avg: todayTx.length ? revenue / todayTx.length : 0,
