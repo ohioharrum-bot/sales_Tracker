@@ -131,8 +131,8 @@ export default function POS() {
 
   /* --------------------- cart manipulation ---------------------- */
   const addProductToCart = useCallback((prod: any, qty = 1) => {
-    setCart((prev) => {
-      const existing = prev.find((c) => c.barcode === prod.barcode && !c.isCustom);
+    setCart((prev: any) => {
+      const existing = prev.find((c: any) => c.barcode === prod.barcode && !c.isCustom);
       const inCart = existing ? existing.qty : 0;
       if (prod.reorder !== 0 && inCart + qty > prod.stock) {
         flash(`${prod.name}: only ${prod.stock} in stock`, "warn");
@@ -140,7 +140,7 @@ export default function POS() {
         qty = prod.stock - inCart;
       }
       if (existing) {
-        return prev.map((c) => (c === existing ? { ...c, qty: c.qty + qty } : c));
+        return prev.map((c: any) => (c === existing ? { ...c, qty: c.qty + qty } : c));
       }
       return [...prev, {
         key: uid(), barcode: prod.barcode, name: prod.name,
@@ -152,19 +152,19 @@ export default function POS() {
   const handleBarcode = useCallback((code: string) => {
     const c = String(code).trim();
     if (!c) return;
-    const prod = products.find((p) => p.barcode === c);
+    const prod = products.find((p: any) => p.barcode === c);
     if (prod) { addProductToCart(prod); flash(`Added ${prod.name}`, "ok"); }
     else { flash(`Unknown barcode: ${c}`, "warn"); }
     setScanInput("");
   }, [products, addProductToCart, flash]);
 
   const changeQty = (key: string, delta: number) => {
-    setCart((prev) => prev.flatMap((c) => {
+    setCart((prev: any) => prev.flatMap((c: any) => {
       if (c.key !== key) return [c];
       const next = c.qty + delta;
       if (next <= 0) return [];
       if (!c.isCustom) {
-        const prod = products.find((p) => p.barcode === c.barcode);
+        const prod = products.find((p: any) => p.barcode === c.barcode);
         if (prod && prod.reorder !== 0 && next > prod.stock) {
           flash(`Only ${prod.stock} in stock`, "warn");
           return [c];
@@ -173,17 +173,17 @@ export default function POS() {
       return [{ ...c, qty: next }];
     }));
   };
-  const removeLine = (key: string) => setCart((prev) => prev.filter((c: any) => c.key !== key));
+  const removeLine = (key: string) => setCart((prev: any) => prev.filter((c: any) => c.key !== key));
   const clearCart = () => { if (cart.length && !window.confirm("Clear the whole cart?")) return; setCart([]); };
 
   /* ----------------------- number pad --------------------------- */
-  const padDigit = (d: number) => setPad((p) => Math.min(p * 10 + d, 99999999));
-  const padDouble = () => setPad((p) => Math.min(p * 100, 99999999));
-  const padBack = () => setPad((p) => Math.floor(p / 10));
+  const padDigit = (d: number) => setPad((p: any) => Math.min(p * 10 + d, 99999999));
+  const padDouble = () => setPad((p: any) => Math.min(p * 100, 99999999));
+  const padBack = () => setPad((p: any) => Math.floor(p / 10));
   const padClear = () => setPad(0);
   const addManualItem = () => {
     if (pad <= 0) { flash("Enter an amount first", "warn"); return; }
-    setCart((prev) => [...prev, {
+    setCart((prev: any) => [...prev, {
       key: uid(), barcode: null, name: "Manual Item",
       price: pad / 100, qty: 1, taxable: padTaxable, isCustom: true,
     }]);
@@ -194,25 +194,25 @@ export default function POS() {
   /* ------------------------- totals ----------------------------- */
   const totals = useMemo(() => {
     let subtotal = 0, taxable = 0;
-    cart.forEach((c) => { const line = c.price * c.qty; subtotal += line; if (c.taxable) taxable += line; });
+    cart.forEach((c: any) => { const line = c.price * c.qty; subtotal += line; if (c.taxable) taxable += line; });
     const tax = taxable * (settings.taxRate / 100);
-    return { subtotal, tax, total: subtotal + tax, count: cart.reduce((a, c) => a + c.qty, 0) };
+    return { subtotal, tax, total: subtotal + tax, count: cart.reduce((a: any, c: any) => a + c.qty, 0) };
   }, [cart, settings.taxRate]);
 
   /* ---------------------- complete sale ------------------------- */
   const completeSale = (method: string, tendered?: number) => {
     const tx = {
       id: uid(), ts: Date.now(),
-      items: cart.map((c) => ({ name: c.name, price: c.price, qty: c.qty, taxable: c.taxable, barcode: c.barcode })),
+      items: cart.map((c: any) => ({ name: c.name, price: c.price, qty: c.qty, taxable: c.taxable, barcode: c.barcode })),
       subtotal: totals.subtotal, tax: totals.tax, total: totals.total,
       method, tendered: tendered ?? totals.total, change: method === "cash" ? (tendered ?? totals.total) - totals.total : 0,
     };
     // decrement inventory
-    setProducts((prev) => prev.map((p) => {
-      const sold = cart.filter((c) => c.barcode === p.barcode && !c.isCustom).reduce((a, c) => a + c.qty, 0);
+    setProducts((prev: any) => prev.map((p: any) => {
+      const sold = cart.filter((c: any) => c.barcode === p.barcode && !c.isCustom).reduce((a: any, c: any) => a + c.qty, 0);
       return sold ? { ...p, stock: Math.max(p.reorder === 0 ? p.stock : 0, p.stock - sold) } : p;
     }));
-    setTransactions((prev) => [tx, ...prev]);
+    setTransactions((prev: any) => [tx, ...prev]);
     setReceipt(tx);
     setCart([]);
     setCheckoutOpen(false);
@@ -221,20 +221,20 @@ export default function POS() {
 
   /* ----------------------- product CRUD ------------------------- */
   const saveProduct = (data: any) => {
-    setProducts((prev) => {
-      const exists = prev.some((p) => p.barcode === data.barcode);
+    setProducts((prev: any) => {
+      const exists = prev.some((p: any) => p.barcode === data.barcode);
       if (editing === "new" || !exists) {
         if (exists) { flash("Barcode already exists", "warn"); return prev; }
         return [...prev, data];
       }
-      return prev.map((p) => (p.barcode === editing.barcode ? data : p));
+      return prev.map((p: any) => (p.barcode === editing.barcode ? data : p));
     });
     setEditing(null);
     flash("Product saved", "ok");
   };
   const deleteProduct = (barcode: string) => {
     if (!window.confirm("Delete this product?")) return;
-    setProducts((prev) => prev.filter((p) => p.barcode !== barcode));
+    setProducts((prev: any) => prev.filter((p: any) => p.barcode !== barcode));
     setEditing(null);
   };
 
@@ -256,9 +256,9 @@ export default function POS() {
   }, [view, checkoutOpen, editing, receipt, handleBarcode]);
 
   /* --------------------------- derived -------------------------- */
-  const quickItems = useMemo(() => products.filter((p) => p.quick), [products]);
+  const quickItems = useMemo(() => products.filter((p: any) => p.quick), [products]);
   const filtered = useMemo(() => {
-    return products.filter((p) => {
+    return products.filter((p: any) => {
       const catOk = activeCat === "All" || p.cat === activeCat;
       const q = search.trim().toLowerCase();
       const sOk = !q || p.name.toLowerCase().includes(q) || p.barcode.includes(q);
@@ -267,7 +267,7 @@ export default function POS() {
   }, [products, activeCat, search]);
 
   const lowStock = useMemo(
-    () => products.filter((p) => p.reorder > 0 && p.stock <= p.reorder),
+    () => products.filter((p: any) => p.reorder > 0 && p.stock <= p.reorder),
     [products]
   );
 
@@ -341,8 +341,8 @@ export default function POS() {
         {view === "inventory" && (
           <InventoryView products={products} lowStock={lowStock}
             onEdit={(p: any) => setEditing(p)} onNew={() => setEditing("new")}
-            onRestock={(bc: string, amt: number) => setProducts((prev) => prev.map((p) => p.barcode === bc ? { ...p, stock: p.stock + amt } : p))}
-            onToggleQuick={(bc: string) => setProducts((prev) => prev.map((p) => p.barcode === bc ? { ...p, quick: !p.quick } : p))}
+            onRestock={(bc: string, amt: number) => setProducts((prev: any) => prev.map((p: any) => p.barcode === bc ? { ...p, stock: p.stock + amt } : p))}
+            onToggleQuick={(bc: string) => setProducts((prev: any) => prev.map((p: any) => p.barcode === bc ? { ...p, quick: !p.quick } : p))}
           />
         )}
         {view === "reports" && (
@@ -402,22 +402,22 @@ function RegisterView(props: any) {
             <ScanLine size={22} className="text-emerald-600 shrink-0" />
             <input
               ref={scanRef} value={scanInput}
-              onChange={(e) => setScanInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter") handleBarcode(scanInput); }}
+              onChange={(e: any) => setScanInput(e.target.value)}
+              onKeyDown={(e: any) => { if (e.key === "Enter") handleBarcode(scanInput); }}
               placeholder="Scan or type barcode…"
               className="flex-1 text-base outline-none bg-transparent font-mono"
             />
           </div>
           <div className="relative shrink-0 w-full sm:w-auto">
             <Search size={16} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input value={search} onChange={(e) => setSearch(e.target.value)}
+            <input value={search} onChange={(e: any) => setSearch(e.target.value)}
               placeholder="Search…" className="w-full sm:w-40 pl-7 pr-2 py-1.5 text-sm rounded-lg bg-slate-100 outline-none" />
           </div>
         </div>
 
         {/* category tabs */}
         <div className="flex gap-2 overflow-x-auto pb-1 no-scrollbar whitespace-nowrap">
-          {["All", ...categories].map((c) => (
+          {["All", ...categories].map((c: any) => (
             <button key={c} onClick={() => setActiveCat(c)}
               className="px-4 py-1.5 rounded-full text-sm font-semibold transition-colors shrink-0"
               style={activeCat === c
@@ -504,12 +504,12 @@ function RegisterView(props: any) {
               <Hash size={13} /> Manual Entry
             </div>
             <label className="flex items-center gap-1 text-xs text-slate-500 cursor-pointer">
-              <input type="checkbox" checked={padTaxable} onChange={(e) => setPadTaxable(e.target.checked)} /> Taxable
+              <input type="checkbox" checked={padTaxable} onChange={(e: any) => setPadTaxable(e.target.checked)} /> Taxable
             </label>
           </div>
           <div className="flex gap-2">
             <div className="flex-1 grid grid-cols-3 gap-1.5">
-              {[1,2,3,4,5,6,7,8,9].map((d) => (
+              {[1,2,3,4,5,6,7,8,9].map((d: any) => (
                 <button key={d} onClick={() => padDigit(d)}
                   className="py-2.5 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 font-bold text-lg shadow-sm">{d}</button>
               ))}
@@ -584,16 +584,16 @@ function CheckoutModal({ totals, onClose, onComplete }: any) {
   const [method, setMethod] = useState("cash");
   const [tendered, setTendered] = useState(0); // cents
 
-  const padDigit = (d: number) => setTendered((p) => Math.min(p * 10 + d, 9999999));
-  const padDouble = () => setTendered((p) => Math.min(p * 100, 9999999));
-  const back = () => setTendered((p) => Math.floor(p / 10));
+  const padDigit = (d: number) => setTendered((p: any) => Math.min(p * 10 + d, 9999999));
+  const padDouble = () => setTendered((p: any) => Math.min(p * 100, 9999999));
+  const back = () => setTendered((p: any) => Math.floor(p / 10));
   const due = totals.total;
   const cash = tendered / 100;
   const change = cash - due;
   const enough = cash >= due;
 
   const quickCash = [due, Math.ceil(due), Math.ceil(due / 5) * 5, Math.ceil(due / 10) * 10, Math.ceil(due / 20) * 20]
-    .filter((v, i, a) => a.indexOf(v) === i).slice(0, 4);
+    .filter((v: any, i: any, a: any) => a.indexOf(v) === i).slice(0, 4);
 
   return (
     <Overlay onClose={onClose}>
@@ -634,7 +634,7 @@ function CheckoutModal({ totals, onClose, onComplete }: any) {
               </div>
               <div className="flex gap-3">
                 <div className="grid grid-cols-3 gap-1.5 flex-1">
-                  {[1,2,3,4,5,6,7,8,9].map((d) => (
+                  {[1,2,3,4,5,6,7,8,9].map((d: any) => (
                     <button key={d} onClick={() => padDigit(d)} className="py-3 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-lg">{d}</button>
                   ))}
                   <button onClick={padDouble} className="py-3 rounded-lg bg-slate-100 hover:bg-slate-200 font-bold text-lg">00</button>
@@ -736,7 +736,7 @@ function InventoryView({ products, lowStock, onEdit, onNew, onRestock, onToggleQ
           <div className="flex gap-2">
             <div className="relative flex-1 sm:flex-initial">
               <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…"
+              <input value={q} onChange={(e: any) => setQ(e.target.value)} placeholder="Search…"
                 className="pl-8 pr-3 py-2 rounded-lg bg-white border border-slate-200 outline-none text-sm w-full sm:w-48" />
             </div>
             <button onClick={onNew} className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-white font-semibold text-sm bg-emerald-600">
@@ -926,11 +926,11 @@ function Field({ label, children }: any) {
 /* ================================================================== */
 function ReportsView({ transactions, products, lowStock, settings, setSettings }: any) {
   const today = todayKey(Date.now());
-  const todayTx = transactions.filter((t) => todayKey(t.ts) === today);
+  const todayTx = transactions.filter((t: any) => todayKey(t.ts) === today);
 
   const stats = useMemo(() => {
-    const revenue = todayTx.reduce((a, t) => a + t.total, 0);
-    const items = todayTx.reduce((a, t) => a + t.items.reduce((s: number, i: any) => s + i.qty, 0), 0);
+    const revenue = todayTx.reduce((a: any, t: any) => a + t.total, 0);
+    const items = todayTx.reduce((a: any, t: any) => a + t.items.reduce((s: number, i: any) => s + i.qty, 0), 0);
     return {
       revenue, count: todayTx.length, items,
       avg: todayTx.length ? revenue / todayTx.length : 0,
@@ -1086,7 +1086,7 @@ function Overlay({ children, onClose }: any) {
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center p-4"
       style={{ background: "rgba(15,17,21,0.55)" }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()}>{children}</div>
+      <div onClick={(e: any) => e.stopPropagation()}>{children}</div>
     </div>
   );
 }

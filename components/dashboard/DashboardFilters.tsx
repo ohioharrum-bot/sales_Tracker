@@ -43,7 +43,7 @@ export function DashboardFilters() {
 
   const updateFilters = (updates: Record<string, string>) => {
     const params = new URLSearchParams(searchParams.toString())
-    Object.entries(updates).forEach(([key, value]) => {
+    Object.entries(updates).forEach(([key, value]: any) => {
       if (value) {
         params.set(key, value)
       } else {
@@ -60,7 +60,7 @@ export function DashboardFilters() {
           label="View"
           options={views}
           value={currentView}
-          onChange={(e) => updateFilters({ view: e.target.value })}
+          onChange={(e: any) => updateFilters({ view: e.target.value })}
         />
       </div>
 
@@ -71,7 +71,7 @@ export function DashboardFilters() {
               label="Month"
               options={months}
               value={currentMonth}
-              onChange={(e) => updateFilters({ month: e.target.value })}
+              onChange={(e: any) => updateFilters({ month: e.target.value })}
             />
           </div>
           <div className="w-full sm:w-auto">
@@ -79,7 +79,7 @@ export function DashboardFilters() {
               label="Year"
               options={years}
               value={currentYear}
-              onChange={(e) => updateFilters({ year: e.target.value })}
+              onChange={(e: any) => updateFilters({ year: e.target.value })}
             />
           </div>
         </>
@@ -91,7 +91,7 @@ export function DashboardFilters() {
             label="Year"
             options={years}
             value={currentYear}
-            onChange={(e) => updateFilters({ year: e.target.value })}
+            onChange={(e: any) => updateFilters({ year: e.target.value })}
           />
         </div>
       )}
@@ -103,7 +103,7 @@ export function DashboardFilters() {
               label="From"
               type="date"
               value={currentFrom}
-              onChange={(e) => updateFilters({ from: e.target.value })}
+              onChange={(e: any) => updateFilters({ from: e.target.value })}
             />
           </div>
           <div className="w-full sm:w-auto">
@@ -111,7 +111,7 @@ export function DashboardFilters() {
               label="To"
               type="date"
               value={currentTo}
-              onChange={(e) => updateFilters({ to: e.target.value })}
+              onChange={(e: any) => updateFilters({ to: e.target.value })}
             />
           </div>
         </>

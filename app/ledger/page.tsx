@@ -69,7 +69,7 @@ export default function LedgerPage() {
           <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Select Store</label>
           <select 
             value={selectedStoreId || ''} 
-            onChange={(e) => setSelectedStoreId(e.target.value)}
+            onChange={(e: any) => setSelectedStoreId(e.target.value)}
             className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 min-w-[200px] shadow-sm"
           >
             {stores.map(store => (
