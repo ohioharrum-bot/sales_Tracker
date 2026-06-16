@@ -980,7 +980,7 @@ function ReportsView({ transactions, products, lowStock, settings, setSettings }
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
                   <XAxis dataKey="day" tick={{ fontSize: 12, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(v: number) => money(v)} cursor={{ fill: "#f8fafc" }} />
+                  <Tooltip formatter={(v: any) => money(v)} cursor={{ fill: "#f8fafc" }} />
                   <Bar dataKey="sales" fill="#10b981" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
