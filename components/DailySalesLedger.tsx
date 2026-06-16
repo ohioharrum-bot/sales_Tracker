@@ -12,6 +12,7 @@ interface SaleEntry {
 }
 interface PayoutEntry {
   id?: string; date: string; amount: number; cat: string; subtype: string; desc: string;
+  payoutId?: string; // Link to the 'payouts' table
 }
 interface CategoryDef {
   label: string; color: string; text: string; subs: string[];
@@ -197,6 +198,23 @@ export default function DailySalesLedger({ storeId }: { storeId: string }) {
     if (error) {
       alert('Error saving entry: ' + error.message);
     } else {
+      // Sync to daily_ledger for dashboard consistency
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(efDay).padStart(2, '0')}`;
+      const ds = sale - (po + bill + pr);
+      
+      await supabase
+        .from('daily_ledger')
+        .upsert({
+          store_id: storeId,
+          date: dateStr,
+          sale: sale,
+          pay_out: po,
+          bills: bill,
+          payroll: pr,
+          day_savings: ds,
+          notes: efReason || (existing?.changeReason ?? null)
+        }, { onConflict: 'store_id, date' });
+
       const key = mk(year, month);
       setSalesStore(prev => ({
         ...prev,
@@ -241,13 +259,40 @@ export default function DailySalesLedger({ storeId }: { storeId: string }) {
     const amount = parseFloat(pfAmount) || 0;
     const existing = pfEditIdx !== null ? getPayouts()[pfEditIdx] : null;
 
+    // First, sync to the main payouts table
+    const payoutPayload: any = {
+      store_id: storeId,
+      recipient_name: pfSubtype || categories[pfCat]?.label || 'Payout',
+      amount,
+      method: 'cash',
+      date: pfDate,
+      status: 'paid',
+      notes: pfDesc
+    };
+
+    // If we have an existing payout, we need to find its ID in the payouts table
+    if (existing && existing.payoutId) {
+      payoutPayload.id = existing.payoutId;
+    }
+
+    const { data: pData, error: pError } = await supabase
+      .from('payouts')
+      .upsert(payoutPayload)
+      .select()
+      .single();
+
+    if (pError) {
+      console.error('Error syncing to payouts table:', pError);
+    }
+
     const entryData = {
       date: pfDate,
       amount,
       cat: pfCat,
       subtype: pfSubtype,
       desc: pfDesc,
-      storeId
+      storeId,
+      payoutId: pData?.id // Store the link
     };
 
     const payload: any = {
@@ -293,6 +338,12 @@ export default function DailySalesLedger({ storeId }: { storeId: string }) {
     if (!confirm(`Remove this ${categories[e.cat]?.label || ''} payout of $${fmt(e.amount)}?`)) return;
     
     setSaving(true);
+    
+    // Also delete from payouts table if we have the link
+    if ((e as any).payoutId) {
+      await supabase.from('payouts').delete().eq('id', (e as any).payoutId);
+    }
+
     const { error } = await supabase.from('ledger_entries').delete().eq('id', e.id);
     
     if (error) {
