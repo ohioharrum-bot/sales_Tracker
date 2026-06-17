@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
     const fmt = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v)
     
     const breakdownLines = result.breakdown
-      .map(b => `${b.name.padEnd(20)}: ${fmt(b.amount)}`)
+      .map((b: { name: string; amount: number }) => `${b.name.padEnd(20)}: ${fmt(b.amount)}`)
       .join('\n')
 
     const dateStr = new Date(today).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })

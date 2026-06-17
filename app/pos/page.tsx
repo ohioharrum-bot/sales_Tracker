@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { createClient } from "@/lib/supabase/client";
 import {
   ShoppingCart, Package, BarChart3, Trash2, Plus, Minus, X, Search,
   Delete, DollarSign, CreditCard, Banknote, Check, AlertTriangle,
@@ -79,6 +80,7 @@ interface Punch {
 
 interface Settings {
   storeName: string;
+  storeId?: string;
   taxRate: number;
   float: number;
   lastClose: number;
@@ -222,6 +224,7 @@ export default function POS() {
   const [timesheet, setTimesheet] = useState<Punch[]>([]);
   const [zreports, setZreports] = useState<ZReport[]>([]);
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
+  const [stores, setStores] = useState<any[]>([]);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [scanInput, setScanInput] = useState("");
@@ -248,16 +251,25 @@ export default function POS() {
   /* load */
   useEffect(() => {
     (async () => {
-      const [p, t, e, ts, z, s] = await Promise.all([
+      const supabase = createClient();
+      const [p, t, e, ts, z, s, { data: dbStores }] = await Promise.all([
         store.get("pos:products"), store.get("pos:transactions"), store.get("pos:employees"),
         store.get("pos:timesheet"), store.get("pos:zreports"), store.get("pos:settings"),
+        supabase.from('stores').select('*').order('name'),
       ]);
       setProducts(p ? JSON.parse(p) : SEED_PRODUCTS);
       setTransactions(t ? JSON.parse(t) : []);
       setEmployees(e ? JSON.parse(e) : SEED_EMPLOYEES);
       setTimesheet(ts ? JSON.parse(ts) : []);
       setZreports(z ? JSON.parse(z) : []);
-      setSettings(s ? JSON.parse(s) : DEFAULT_SETTINGS);
+      setStores(dbStores || []);
+
+      const loadedSettings = s ? JSON.parse(s) : DEFAULT_SETTINGS;
+      if (!loadedSettings.storeId && dbStores && dbStores.length > 0) {
+        loadedSettings.storeId = dbStores[0].id;
+        loadedSettings.storeName = dbStores[0].name;
+      }
+      setSettings(loadedSettings);
       setLoaded(true);
     })();
   }, []);
@@ -358,7 +370,7 @@ export default function POS() {
   }, [cart, discount, settings.taxRate]);
 
   /* complete sale — payments: [{method, amount, given?}], change = cash overpayment */
-  const completeSale = (payments: { method: string; amount: number; given?: number }[], change: number) => {
+  const completeSale = async (payments: { method: string; amount: number; given?: number }[], change: number) => {
     const methods = new Set(payments.map((p) => p.method));
     const tendered = payments.reduce((a, p) => a + (p.given != null ? p.given : p.amount), 0);
     const tx: Transaction = {
@@ -369,6 +381,36 @@ export default function POS() {
       payments: payments.map((p) => ({ method: p.method, amount: p.amount })),
       tendered, change: change || 0,
     };
+
+    // 1. Post to Backend
+    if (settings.storeId) {
+      try {
+        const res = await fetch('/api/sales', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            store_id: settings.storeId,
+            date: new Date().toISOString().split('T')[0],
+            amount: totals.total,
+            category: 'POS Sale',
+            payment_method: tx.method === 'split' ? 'other' : (tx.method === 'card' ? 'card' : 'cash'),
+            notes: `POS Transaction ${tx.id} - Cashier: ${tx.cashier}`,
+          })
+        });
+        if (!res.ok) {
+          const err = await res.json();
+          console.error('[POS] Backend sync failed:', err);
+          flash("Cloud sync failed, saved locally", "warn");
+        } else {
+          console.log('[POS] Sale synced to cloud');
+        }
+      } catch (err) {
+        console.error('[POS] Sync error:', err);
+        flash("Network error, saved locally", "warn");
+      }
+    }
+
+    // 2. Update local state
     setProducts((prev) => prev.map((p) => {
       const sold = cart.filter((c) => c.barcode === p.barcode && !c.isCustom).reduce((a, c) => a + c.qty, 0);
       return sold && p.reorder !== 0 ? { ...p, stock: Math.max(0, p.stock - sold) } : p;
@@ -496,6 +538,18 @@ export default function POS() {
           ))}
         </nav>
         <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md" style={{ background: "#222834" }}>
+            <Package size={13} className="text-slate-400" />
+            <select 
+              value={settings.storeId} 
+              onChange={(e) => {
+                const s = stores.find(st => st.id === e.target.value);
+                if (s) setSettings((prev: any) => ({ ...prev, storeId: s.id, storeName: s.name }));
+              }}
+              className="bg-transparent text-sm font-semibold outline-none cursor-pointer" style={{ color: "white" }}>
+              {stores.map((s) => <option key={s.id} value={s.id} style={{ color: "black" }}>{s.name}</option>)}
+            </select>
+          </div>
           <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md" style={{ background: "#222834" }}>
             <Lock size={13} className="text-slate-400" />
             <select value={settings.activeCashier} onChange={(e) => setSettings((s: any) => ({ ...s, activeCashier: e.target.value }))}
