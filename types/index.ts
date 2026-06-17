@@ -5,6 +5,7 @@ export interface Store {
   id: string
   name: string
   description: string | null
+  timezone: string
   owner_id: string
   created_at: string
 }

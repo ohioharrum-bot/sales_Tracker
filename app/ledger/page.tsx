@@ -22,7 +22,9 @@ export default function LedgerPage() {
       if (data) {
         setStores(data)
         if (data.length > 0) {
-          setSelectedStoreId(data[0].id)
+          // Priority: Daily Combined Ledger
+          const combined = data.find(s => s.name === 'Daily Combined Ledger')
+          setSelectedStoreId(combined ? combined.id : data[0].id)
         }
       }
       setLoading(false)

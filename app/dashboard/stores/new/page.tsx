@@ -4,7 +4,16 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { storeSchema } from '@/lib/validations'
-import { Input, Textarea, Button, Card, PageHeader } from '@/components/ui'
+import { Input, Textarea, Button, Card, PageHeader, Select } from '@/components/ui'
+
+const TIMEZONES = [
+  { label: 'Eastern (ET)', value: 'America/New_York' },
+  { label: 'Central (CT)', value: 'America/Chicago' },
+  { label: 'Mountain (MT)', value: 'America/Denver' },
+  { label: 'Pacific (PT)', value: 'America/Los_Angeles' },
+  { label: 'Alaska (AKT)', value: 'America/Anchorage' },
+  { label: 'Hawaii (HT)', value: 'Pacific/Honolulu' },
+]
 
 export default function NewStorePage() {
   const router = useRouter()
@@ -13,6 +22,7 @@ export default function NewStorePage() {
   const [form, setForm] = useState({
     name: '',
     description: '',
+    timezone: 'America/New_York',
   })
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -41,6 +51,7 @@ export default function NewStorePage() {
       .insert({
         name: result.data.name,
         description: result.data.description || null,
+        timezone: result.data.timezone,
         owner_id: user.id,
       })
       .select()
@@ -66,6 +77,12 @@ export default function NewStorePage() {
             value={form.name}
             onChange={e => setForm({ ...form, name: e.target.value })}
             placeholder="e.g. Main Street Branch"
+          />
+          <Select
+            label="Timezone"
+            options={TIMEZONES}
+            value={form.timezone}
+            onChange={e => setForm({ ...form, timezone: e.target.value })}
           />
           <Textarea
             label="Description"

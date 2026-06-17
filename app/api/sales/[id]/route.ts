@@ -22,11 +22,13 @@ export async function DELETE(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Trigger sync
+  console.log(`[Sales] Sale deleted successfully, triggering sync for date: ${sale.date}`)
   try {
-    const { syncDailyLedger } = await import('@/lib/ledger-sync')
-    await syncDailyLedger(sale.store_id, sale.date)
+    const { syncCombinedLedger } = await import('@/lib/combined-sync')
+    await syncCombinedLedger(supabase, sale.date, (await supabase.auth.getUser()).data.user!.id)
+    console.log('[Sales] Combined ledger sync completed')
   } catch (syncError) {
-    console.error('Failed to sync ledger after sale deletion:', syncError)
+    console.error('[Sales] Failed to sync combined ledger after sale deletion:', syncError)
   }
 
   return NextResponse.json({ success: true })
@@ -38,6 +40,9 @@ export async function PATCH(
 ) {
   const supabase = await createClient()
   const { id } = await params
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  
   const body = await request.json()
 
   // Get current sale data for sync before update
@@ -59,14 +64,17 @@ export async function PATCH(
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Trigger sync for both old and new dates (in case date was changed)
+  console.log(`[Sales] Sale updated successfully, triggering sync for date: ${currentSale.date}`)
   try {
-    const { syncDailyLedger } = await import('@/lib/ledger-sync')
-    await syncDailyLedger(currentSale.store_id, currentSale.date)
+    const { syncCombinedLedger } = await import('@/lib/combined-sync')
+    await syncCombinedLedger(supabase, currentSale.date, user.id)
     if (body.date && body.date !== currentSale.date) {
-      await syncDailyLedger(currentSale.store_id, body.date)
+      console.log(`[Sales] Date changed to ${body.date}, triggering second sync`)
+      await syncCombinedLedger(supabase, body.date, user.id)
     }
+    console.log('[Sales] Combined ledger sync completed')
   } catch (syncError) {
-    console.error('Failed to sync ledger after sale update:', syncError)
+    console.error('[Sales] Failed to sync combined ledger after sale update:', syncError)
   }
 
   return NextResponse.json(data)

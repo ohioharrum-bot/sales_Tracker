@@ -3,6 +3,7 @@ import { z } from 'zod'
 export const storeSchema = z.object({
   name: z.string().min(1, 'Store name is required').max(100),
   description: z.string().max(500).optional(),
+  timezone: z.string().default('America/New_York'),
 })
 
 export const saleSchema = z.object({

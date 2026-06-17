@@ -59,11 +59,13 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Trigger automatic ledger sync
+  console.log(`[Expenses] Expense created successfully, triggering sync for date: ${result.data.date}`)
   try {
-    const { syncDailyLedger } = await import('@/lib/ledger-sync')
-    await syncDailyLedger(result.data.store_id, result.data.date)
+    const { syncCombinedLedger } = await import('@/lib/combined-sync')
+    await syncCombinedLedger(supabase, result.data.date, user.id)
+    console.log('[Expenses] Combined ledger sync completed')
   } catch (syncError) {
-    console.error('Failed to sync ledger after expense:', syncError)
+    console.error('[Expenses] Failed to sync combined ledger after expense:', syncError)
   }
 
   return NextResponse.json(data, { status: 201 })

@@ -59,11 +59,13 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Trigger automatic ledger sync
+  console.log(`[Sales] Sale created successfully, triggering sync for date: ${result.data.date}`)
   try {
-    const { syncDailyLedger } = await import('@/lib/ledger-sync')
-    await syncDailyLedger(result.data.store_id, result.data.date)
+    const { syncCombinedLedger } = await import('@/lib/combined-sync')
+    await syncCombinedLedger(supabase, result.data.date, user.id)
+    console.log('[Sales] Combined ledger sync completed')
   } catch (syncError) {
-    console.error('Failed to sync ledger after sale:', syncError)
+    console.error('[Sales] Failed to sync combined ledger after sale:', syncError)
     // We don't fail the request if sync fails, but we log it
   }
 
