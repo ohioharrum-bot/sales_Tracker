@@ -4,10 +4,10 @@ import { saleSchema } from '@/lib/validations'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient()
-  const { id } = params
+  const { id } = await params
 
   // Get sale date and store_id before deleting for sync
   const { data: sale } = await supabase
@@ -34,10 +34,10 @@ export async function DELETE(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient()
-  const { id } = params
+  const { id } = await params
   const body = await request.json()
 
   // Get current sale data for sync before update
