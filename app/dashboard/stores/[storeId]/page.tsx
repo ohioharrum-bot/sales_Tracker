@@ -92,6 +92,30 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ storeI
   }
   const net = stats.revenue - stats.expenses - stats.payouts
 
+  const [syncing, setSyncing] = useState(false)
+  async function handleSync() {
+    setSyncing(true)
+    try {
+      const res = await fetch('/api/ledger/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ store_id: storeId, date: today })
+      })
+      if (res.ok) {
+        alert('Ledger synchronized successfully!')
+        router.refresh()
+        load()
+      } else {
+        const data = await res.json()
+        alert('Error syncing ledger: ' + data.error)
+      }
+    } catch (err) {
+      alert('Failed to sync ledger.')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center py-20">
       <div className="w-5 h-5 border-2 border-slate-900 border-t-transparent rounded-full animate-spin" />
@@ -131,12 +155,19 @@ export default function StoreOverviewPage({ params }: { params: Promise<{ storeI
       </div>
 
       {/* Action Strip */}
-      <div className="flex">
-        <Link href={`/dashboard/stores/${storeId}/ledger`} className="w-full">
+      <div className="flex flex-col sm:flex-row gap-4">
+        <Link href={`/dashboard/stores/${storeId}/ledger`} className="flex-1">
           <button className="w-full py-6 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-slate-800 transition-all shadow-2xl shadow-slate-200 active:scale-[0.99]">
              Access Daily Ledger
           </button>
         </Link>
+        <button 
+          onClick={handleSync}
+          disabled={syncing}
+          className="flex-1 py-6 bg-white border border-zen-border text-zen-text rounded-2xl text-[10px] font-black uppercase tracking-[0.3em] hover:bg-slate-50 transition-all zen-shadow active:scale-[0.99] disabled:opacity-50"
+        >
+          {syncing ? 'Synchronizing...' : 'Close Day & Sync Ledger'}
+        </button>
       </div>
 
       {/* Activity - List Style */}

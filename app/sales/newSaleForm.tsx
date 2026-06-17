@@ -55,17 +55,22 @@ export default function NewSaleForm({ params }: { params: { storeId: string } })
 
     setLoading(true)
 
-    const { error: insertError } = await supabase.from('sales').insert({
-      store_id: storeId,
-      date: result.data.date,
-      amount: result.data.amount,
-      category: result.data.category,
-      payment_method: result.data.payment_method,
-      notes: result.data.notes || null,
+    const response = await fetch('/api/sales', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        store_id: storeId,
+        date: result.data.date,
+        amount: result.data.amount,
+        category: result.data.category,
+        payment_method: result.data.payment_method,
+        notes: result.data.notes || null,
+      })
     })
 
-    if (insertError) {
-      setError(insertError.message)
+    if (!response.ok) {
+      const errorData = await response.json()
+      setError(errorData.error || 'Failed to save sale')
       setLoading(false)
       return
     }

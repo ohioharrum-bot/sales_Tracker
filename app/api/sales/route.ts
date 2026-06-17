@@ -57,5 +57,15 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Trigger automatic ledger sync
+  try {
+    const { syncDailyLedger } = await import('@/lib/ledger-sync')
+    await syncDailyLedger(result.data.store_id, result.data.date)
+  } catch (syncError) {
+    console.error('Failed to sync ledger after sale:', syncError)
+    // We don't fail the request if sync fails, but we log it
+  }
+
   return NextResponse.json(data, { status: 201 })
 }

@@ -33,8 +33,13 @@ export default function SalesPage({ params }: { params: Promise<{ storeId: strin
   useEffect(() => { load() }, [storeId])
 
   async function handleDelete(id: string) {
-    await supabase.from('sales').delete().eq('id', id)
-    setSales(prev => prev.filter(s => s.id !== id))
+    const res = await fetch(`/api/sales/${id}`, { method: 'DELETE' })
+    if (res.ok) {
+      setSales(prev => prev.filter(s => s.id !== id))
+    } else {
+      const data = await res.json()
+      alert('Error deleting sale: ' + data.error)
+    }
   }
 
   const total = sales.reduce((sum, s) => sum + Number(s.amount), 0)

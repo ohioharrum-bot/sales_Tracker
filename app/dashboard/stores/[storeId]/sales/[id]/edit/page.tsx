@@ -43,11 +43,26 @@ export default function EditSalePage({ params }: { params: Promise<{ storeId: st
     const result = saleSchema.safeParse({ ...form, store_id: storeId })
     if (!result.success) { setError(result.error.issues[0].message); return }
     setLoading(true)
-    const { error: updateError } = await supabase.from('sales').update({
-      date: result.data.date, amount: result.data.amount, category: result.data.category,
-      payment_method: result.data.payment_method, notes: result.data.notes || null,
-    }).eq('id', id)
-    if (updateError) { setError(updateError.message); setLoading(false); return }
+    
+    const response = await fetch(`/api/sales/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        date: result.data.date, 
+        amount: result.data.amount, 
+        category: result.data.category,
+        payment_method: result.data.payment_method, 
+        notes: result.data.notes || null,
+      })
+    })
+
+    if (!response.ok) {
+      const data = await response.json()
+      setError(data.error || 'Failed to update sale')
+      setLoading(false)
+      return
+    }
+
     router.push(`/dashboard/stores/${storeId}/sales`)
     router.refresh()
   }
