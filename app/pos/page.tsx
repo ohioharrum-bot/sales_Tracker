@@ -240,8 +240,6 @@ export default function POS() {
   const [activeCat, setActiveCat] = useState("All");
   const [search, setSearch] = useState("");
   const [pendingQty, setPendingQty] = useState(1);
-  const [qtyBuilding, setQtyBuilding] = useState(false);
-  const [padMode, setPadMode] = useState<"qty" | "price">("qty");
   const [pad, setPad] = useState(0);
   const [padTaxable, setPadTaxable] = useState(true);
   const [discount, setDiscount] = useState<{ type: 'pct' | 'amt'; value: number } | null>(null);   // {type:'pct'|'amt', value}
@@ -417,15 +415,7 @@ export default function POS() {
     addProductToCart(prod, qty);
     flash(`${qty > 1 ? qty + "× " : ""}${prod.name}`, "ok");
     setPendingQty(1);
-    setQtyBuilding(false);
-    if (padMode === "qty") setPad(0);
-  }, [pendingQty, ageOk, addProductToCart, flash, padMode]);
-
-  const resetQtyPad = useCallback(() => {
-    setPendingQty(1);
-    setQtyBuilding(false);
-    if (padMode === "qty") setPad(0);
-  }, [padMode]);
+  }, [pendingQty, ageOk, addProductToCart, flash]);
 
   const handleBarcode = useCallback((code: string) => {
     const c = String(code).trim();
@@ -453,7 +443,7 @@ export default function POS() {
     }));
   };
   const removeLine = (key: string) => setCart((prev) => prev.filter((c) => c.key !== key));
-  const resetSale = () => { setCart([]); setDiscount(null); setAgeOk(false); resetQtyPad(); setPad(0); setPadMode("qty"); };
+  const resetSale = () => { setCart([]); setDiscount(null); setAgeOk(false); setPendingQty(1); setPad(0); };
   const clearCart = () => { if (cart.length && !window.confirm("Clear the whole cart?")) return; resetSale(); };
 
   const syncSaleToCloud = async (tx: Transaction, total: number) => {
@@ -518,8 +508,7 @@ export default function POS() {
     setReceipt(tx);
     flash(`Manual sale ${money(total)}`, "ok");
     setPad(0);
-    resetQtyPad();
-    setPadMode("qty");
+    setPendingQty(1);
   };
 
   /* totals */
@@ -761,8 +750,6 @@ export default function POS() {
             onAdd={handleAddIntent} cart={cart} totals={totals} discount={discount}
             scanInput={scanInput} setScanInput={setScanInput} handleBarcode={handleBarcode} scanRef={scanRef}
             pendingQty={pendingQty} setPendingQty={setPendingQty}
-            qtyBuilding={qtyBuilding} setQtyBuilding={setQtyBuilding}
-            padMode={padMode} setPadMode={setPadMode}
             changeQty={changeQty} removeLine={removeLine} clearCart={clearCart}
             pad={pad} setPad={setPad} addManualItem={addManualItem} padTaxable={padTaxable} setPadTaxable={setPadTaxable}
             onCheckout={() => (cart.length ? setCheckoutOpen(true) : flash("Cart is empty", "warn"))}
@@ -796,7 +783,7 @@ export default function POS() {
       {returnsOpen && <ReturnsModal transactions={transactions} taxRate={settings.taxRate} onClose={() => setReturnsOpen(false)} onRefund={processRefund} />}
       {ageVerify && (
         <AgeVerifyModal product={ageVerify.prod}
-          onConfirm={() => { addProductToCart(ageVerify.prod, ageVerify.qty); setAgeOk(true); resetQtyPad(); setAgeVerify(null); }}
+          onConfirm={() => { addProductToCart(ageVerify.prod, ageVerify.qty); setAgeOk(true); setPendingQty(1); setAgeVerify(null); }}
           onDeny={() => { setAgeVerify(null); flash("Sale of age-restricted item denied", "warn"); }} />
       )}
       {receipt && <ReceiptModal data={receipt} storeName={settings.storeName} onClose={() => setReceipt(null)} />}
@@ -832,62 +819,6 @@ function CentsPad({ setValue, big }: any) {
   );
 }
 
-function RegisterPad({ mode, setMode, pendingQty, setPendingQty, qtyBuilding, setQtyBuilding, pad, setPad }: any) {
-  const cls = "rounded-lg bg-slate-100 hover:bg-slate-200 font-bold py-2.5 text-base";
-  const modeBtn = (m: string, label: string) => (
-    <button onClick={() => { setMode(m); if (m === "qty") setPad(0); else setQtyBuilding(false); }}
-      className="flex-1 py-1 rounded-md text-xs font-bold"
-      style={mode === m ? { background: "#14181f", color: "white" } : { background: "#f1f5f9", color: "#64748b" }}>{label}</button>
-  );
-
-  const pressDigit = (n: number) => {
-    if (mode === "qty") {
-      setPendingQty((q: number) => {
-        const next = qtyBuilding ? Math.min(999, q * 10 + n) : n;
-        return Math.max(1, next);
-      });
-      setQtyBuilding(true);
-    } else {
-      setPad((v: number) => Math.min(v * 10 + n, 99999999));
-    }
-  };
-
-  const pressDoubleZero = () => {
-    if (mode === "qty") pressDigit(0);
-    else setPad((v: number) => Math.min(v * 100, 99999999));
-  };
-
-  const back = () => {
-    if (mode === "qty") {
-      setPendingQty((q: number) => {
-        const next = Math.floor(q / 10);
-        if (next < 1) { setQtyBuilding(false); return 1; }
-        return next;
-      });
-    } else {
-      setPad((v: number) => Math.floor(v / 10));
-    }
-  };
-
-  const clear = () => {
-    if (mode === "qty") { setPendingQty(1); setQtyBuilding(false); }
-    else setPad(0);
-  };
-
-  return (
-    <div>
-      <div className="flex gap-1 mb-1.5">{modeBtn("qty", "QTY")}{modeBtn("price", "$ AMT")}</div>
-      <div className="grid grid-cols-3 gap-1.5">
-        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => <button key={n} onClick={() => pressDigit(n)} className={cls}>{n}</button>)}
-        <button onClick={pressDoubleZero} className={cls}>00</button>
-        <button onClick={() => pressDigit(0)} className={cls}>0</button>
-        <button onClick={back} className={cls + " flex items-center justify-center"}><Delete size={18} /></button>
-      </div>
-      <button onClick={clear} className="w-full mt-1.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-500">Clear</button>
-    </div>
-  );
-}
-
 /* ================================================================== */
 /*  Register                                                           */
 /* ================================================================== */
@@ -895,7 +826,6 @@ function RegisterView(props: any) {
   const {
     quickItems, filtered, categories, activeCat, setActiveCat, search, setSearch, onAdd, cart, totals, discount,
     scanInput, setScanInput, handleBarcode, scanRef, pendingQty, setPendingQty,
-    qtyBuilding, setQtyBuilding, padMode, setPadMode,
     changeQty, removeLine, clearCart,
     pad, setPad, addManualItem, padTaxable, setPadTaxable, onCheckout, onDiscount, onClearDiscount, onReturns,
     held, onHold, onResume,
@@ -930,7 +860,7 @@ function RegisterView(props: any) {
             <button onClick={() => setPendingQty((q: any) => Math.min(999, q + 1))} className="w-8 h-8 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Plus size={15} /></button>
           </div>
         </div>
-        {pendingQty > 1 && padMode === "qty" && (
+        {pendingQty > 1 && (
           <div className="-mt-1 text-xs font-semibold flex items-center gap-1" style={{ color: "#d97706" }}>
             <Hash size={12} /> Next item will be added ×{pendingQty}. Scan or tap it now.
           </div>
@@ -995,31 +925,18 @@ function RegisterView(props: any) {
           ))}
         </div>
 
-        {/* numpad: QTY mode (type qty then scan) or $ AMT mode (manual entry) */}
+        {/* manual entry */}
         <div className="border-t border-slate-100 px-3 pt-2 pb-1">
           <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
-              <Hash size={13} /> {padMode === "qty" ? "Quantity (then scan)" : "Manual Entry"}
-            </div>
-            {padMode === "price" && (
-              <label className="flex items-center gap-1 text-xs text-slate-500 cursor-pointer"><input type="checkbox" checked={padTaxable} onChange={(e) => setPadTaxable(e.target.checked)} /> Taxable</label>
-            )}
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400"><Hash size={13} /> Manual Entry</div>
+            <label className="flex items-center gap-1 text-xs text-slate-500 cursor-pointer"><input type="checkbox" checked={padTaxable} onChange={(e) => setPadTaxable(e.target.checked)} /> Taxable</label>
           </div>
           <div className="flex gap-2">
-            <div className="flex-1">
-              <RegisterPad mode={padMode} setMode={setPadMode} pendingQty={pendingQty} setPendingQty={setPendingQty}
-                qtyBuilding={qtyBuilding} setQtyBuilding={setQtyBuilding} pad={pad} setPad={setPad} />
-            </div>
+            <div className="flex-1"><CentsPad setValue={setPad} /></div>
             <div className="flex flex-col gap-1.5" style={{ width: 110 }}>
-              <div className="flex-1 flex flex-col items-end justify-center px-2 rounded-lg font-mono font-bold text-xl" style={{ background: "#0f1115", color: padMode === "qty" ? "#fbbf24" : "#34d399" }}>
-                {padMode === "qty" ? (pendingQty > 1 || qtyBuilding ? `×${pendingQty}` : "×1") : money(pad / 100)}
-              </div>
-              {padMode === "price" && (
-                <button onClick={addManualItem} className="py-2 rounded-lg font-semibold text-white text-sm" style={{ background: "#14181f" }}>Ring Sale</button>
-              )}
-              {padMode === "qty" && (
-                <div className="text-[10px] text-slate-400 text-center leading-tight">Type qty, then scan or tap item</div>
-              )}
+              <div className="flex-1 flex flex-col items-end justify-center px-2 rounded-lg font-mono font-bold text-xl" style={{ background: "#0f1115", color: "#34d399" }}>{money(pad / 100)}</div>
+              <button onClick={() => setPad(0)} className="py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold">Clear</button>
+              <button onClick={addManualItem} className="py-2 rounded-lg font-semibold text-white text-sm" style={{ background: "#14181f" }}>Ring Sale</button>
             </div>
           </div>
         </div>
