@@ -177,8 +177,17 @@ const DEFAULT_SETTINGS: Settings = { storeName: "Quick Stop Market", taxRate: 7.
 /* ------------------------------------------------------------------ */
 const money = (n: number) => (n < 0 ? "-$" + Math.abs(n).toFixed(2) : "$" + (Number(n) || 0).toFixed(2));
 const uid = () => Math.random().toString(36).slice(2, 10);
-const dayKey = (d: number | Date) => new Date(d).toISOString().slice(0, 10);
+const dayKey = (d: number | Date) => {
+  const date = new Date(d);
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
 const itemKey = (it: { barcode?: string | null; name: string }) => it.barcode || "c:" + it.name;
+
+let txSeq = 0;
+const uniqueTs = () => Date.now() + ++txSeq;
 
 function computeDayStats(txs: Transaction[], since: number, float: number): DayStats {
   let grossSales = 0, refundTotal = 0, taxColl = 0, cashSales = 0, cardSales = 0,
@@ -231,6 +240,8 @@ export default function POS() {
   const [activeCat, setActiveCat] = useState("All");
   const [search, setSearch] = useState("");
   const [pendingQty, setPendingQty] = useState(1);
+  const [qtyBuilding, setQtyBuilding] = useState(false);
+  const [padMode, setPadMode] = useState<"qty" | "price">("qty");
   const [pad, setPad] = useState(0);
   const [padTaxable, setPadTaxable] = useState(true);
   const [discount, setDiscount] = useState<{ type: 'pct' | 'amt'; value: number } | null>(null);   // {type:'pct'|'amt', value}
@@ -248,17 +259,71 @@ export default function POS() {
   const scanRef = useRef<HTMLInputElement>(null);
   const [now, setNow] = useState(Date.now());
 
+  /* cloud helpers */
+  const fetchProductsFromCloud = useCallback(async (storeId: string) => {
+    const res = await fetch(`/api/products?store_id=${storeId}&_=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) throw new Error("Failed to load inventory");
+    let list: Product[] = await res.json();
+
+    if (list.length === 0) {
+      const local = await store.get("pos:products");
+      const seed = local ? JSON.parse(local) as Product[] : SEED_PRODUCTS;
+      await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ store_id: storeId, products: seed }),
+      });
+      if (local) await store.set("pos:products", "");
+      const res2 = await fetch(`/api/products?store_id=${storeId}&_=${Date.now()}`, { cache: "no-store" });
+      if (res2.ok) list = await res2.json();
+    }
+    return list;
+  }, []);
+
+  const syncProductToCloud = useCallback(async (storeId: string, product: Product) => {
+    await fetch("/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ store_id: storeId, ...product }),
+    });
+  }, []);
+
+  const fetchTransactionsFromCloud = useCallback(async (storeId: string) => {
+    const res = await fetch(`/api/pos-transactions?store_id=${storeId}&_=${Date.now()}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return (await res.json()) as Transaction[];
+  }, []);
+
+  const persistTransactions = useCallback((txs: Transaction[]) => {
+    store.set("pos:transactions", JSON.stringify(txs));
+  }, []);
+
+  const recordTransaction = useCallback((tx: Transaction) => {
+    setTransactions((prev) => {
+      const next = [tx, ...prev.filter((t) => t.id !== tx.id)];
+      persistTransactions(next);
+      return next;
+    });
+    if (settings.storeId) {
+      const { id, ts, type, ...data } = tx;
+      fetch("/api/pos-transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ store_id: settings.storeId, id, ts, type, data }),
+      }).catch((err) => console.error("[POS] Transaction cloud sync failed:", err));
+    }
+  }, [settings.storeId, persistTransactions]);
+
   /* load */
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const [p, t, e, ts, z, s, { data: dbStores }] = await Promise.all([
-        store.get("pos:products"), store.get("pos:transactions"), store.get("pos:employees"),
+      const [t, e, ts, z, s, { data: dbStores }] = await Promise.all([
+        store.get("pos:transactions"), store.get("pos:employees"),
         store.get("pos:timesheet"), store.get("pos:zreports"), store.get("pos:settings"),
         supabase.from('stores').select('*').order('name'),
       ]);
-      setProducts(p ? JSON.parse(p) : SEED_PRODUCTS);
-      setTransactions(t ? JSON.parse(t) : []);
+      const localTx: Transaction[] = t ? JSON.parse(t) : [];
       setEmployees(e ? JSON.parse(e) : SEED_EMPLOYEES);
       setTimesheet(ts ? JSON.parse(ts) : []);
       setZreports(z ? JSON.parse(z) : []);
@@ -270,13 +335,48 @@ export default function POS() {
         loadedSettings.storeName = dbStores[0].name;
       }
       setSettings(loadedSettings);
+
+      const storeId = loadedSettings.storeId;
+      if (storeId) {
+        try {
+          const [cloudProducts, cloudTx] = await Promise.all([
+            fetchProductsFromCloud(storeId),
+            fetchTransactionsFromCloud(storeId),
+          ]);
+          setProducts(cloudProducts);
+          if (cloudTx && cloudTx.length > 0) {
+            const merged = [...cloudTx];
+            const cloudIds = new Set(cloudTx.map((x) => x.id));
+            localTx.forEach((x) => { if (!cloudIds.has(x.id)) merged.push(x); });
+            merged.sort((a, b) => b.ts - a.ts);
+            setTransactions(merged);
+            persistTransactions(merged);
+          } else {
+            setTransactions(localTx);
+          }
+        } catch (err) {
+          console.error("[POS] Cloud load failed, using local fallback:", err);
+          const local = await store.get("pos:products");
+          setProducts(local ? JSON.parse(local) : SEED_PRODUCTS);
+          setTransactions(localTx);
+        }
+      } else {
+        setProducts(SEED_PRODUCTS);
+        setTransactions(localTx);
+      }
       setLoaded(true);
     })();
-  }, []);
+  }, [fetchProductsFromCloud, fetchTransactionsFromCloud, persistTransactions]);
 
-  /* persist */
-  useEffect(() => { if (loaded) store.set("pos:products", JSON.stringify(products)); }, [products, loaded]);
-  useEffect(() => { if (loaded) store.set("pos:transactions", JSON.stringify(transactions)); }, [transactions, loaded]);
+  /* refresh inventory when store changes */
+  useEffect(() => {
+    if (!loaded || !settings.storeId) return;
+    fetchProductsFromCloud(settings.storeId)
+      .then(setProducts)
+      .catch((err) => console.error("[POS] Inventory refresh failed:", err));
+  }, [loaded, settings.storeId, fetchProductsFromCloud]);
+
+  /* persist (non-inventory) */
   useEffect(() => { if (loaded) store.set("pos:employees", JSON.stringify(employees)); }, [employees, loaded]);
   useEffect(() => { if (loaded) store.set("pos:timesheet", JSON.stringify(timesheet)); }, [timesheet, loaded]);
   useEffect(() => { if (loaded) store.set("pos:zreports", JSON.stringify(zreports)); }, [zreports, loaded]);
@@ -317,7 +417,15 @@ export default function POS() {
     addProductToCart(prod, qty);
     flash(`${qty > 1 ? qty + "× " : ""}${prod.name}`, "ok");
     setPendingQty(1);
-  }, [pendingQty, ageOk, addProductToCart, flash]);
+    setQtyBuilding(false);
+    if (padMode === "qty") setPad(0);
+  }, [pendingQty, ageOk, addProductToCart, flash, padMode]);
+
+  const resetQtyPad = useCallback(() => {
+    setPendingQty(1);
+    setQtyBuilding(false);
+    if (padMode === "qty") setPad(0);
+  }, [padMode]);
 
   const handleBarcode = useCallback((code: string) => {
     const c = String(code).trim();
@@ -345,16 +453,73 @@ export default function POS() {
     }));
   };
   const removeLine = (key: string) => setCart((prev) => prev.filter((c) => c.key !== key));
-  const resetSale = () => { setCart([]); setDiscount(null); setAgeOk(false); setPendingQty(1); setPad(0); };
+  const resetSale = () => { setCart([]); setDiscount(null); setAgeOk(false); resetQtyPad(); setPad(0); setPadMode("qty"); };
   const clearCart = () => { if (cart.length && !window.confirm("Clear the whole cart?")) return; resetSale(); };
 
-  /* manual line */
+  const syncSaleToCloud = async (tx: Transaction, total: number) => {
+    if (!settings.storeId) return;
+    try {
+      const res = await fetch('/api/sales', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          store_id: settings.storeId,
+          date: dayKey(tx.ts),
+          amount: total,
+          category: 'POS Sale',
+          payment_method: tx.method === 'split' ? 'other' : (tx.method === 'card' ? 'card' : 'cash'),
+          notes: `POS Transaction ${tx.id} - Cashier: ${tx.cashier}`,
+        })
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        console.error('[POS] Backend sync failed:', err);
+        flash("Cloud sync failed, saved locally", "warn");
+      }
+    } catch (err) {
+      console.error('[POS] Sync error:', err);
+      flash("Network error, saved locally", "warn");
+    }
+  };
+
+  const applyStockChanges = useCallback((soldCart: CartItem[]) => {
+    setProducts((prev) => {
+      const next = prev.map((p) => {
+        const sold = soldCart.filter((c) => c.barcode === p.barcode && !c.isCustom).reduce((a, c) => a + c.qty, 0);
+        return sold && p.reorder !== 0 ? { ...p, stock: Math.max(0, p.stock - sold) } : p;
+      });
+      if (settings.storeId) {
+        next.forEach((p) => {
+          const sold = soldCart.filter((c) => c.barcode === p.barcode && !c.isCustom).reduce((a, c) => a + c.qty, 0);
+          if (sold && p.reorder !== 0) syncProductToCloud(settings.storeId!, p);
+        });
+      }
+      return next;
+    });
+  }, [settings.storeId, syncProductToCloud]);
+
+  /* manual line — each charge rings out immediately as its own cash sale */
   const addManualItem = () => {
     if (pad <= 0) { flash("Enter an amount first", "warn"); return; }
     const qty = Math.max(1, pendingQty);
-    setCart((prev) => [...prev, { key: uid(), barcode: null, name: "Manual Item", price: pad / 100, qty, taxable: padTaxable, isCustom: true }]);
-    flash(`Manual ${money(pad / 100)}`, "ok");
-    setPad(0); setPendingQty(1);
+    const price = pad / 100;
+    const subtotal = price * qty;
+    const tax = padTaxable ? subtotal * (settings.taxRate / 100) : 0;
+    const total = subtotal + tax;
+    const items: TransactionItem[] = [{ name: "Manual Item", price, qty, taxable: padTaxable, barcode: null }];
+    const tx: Transaction = {
+      id: uid(), ts: uniqueTs(), type: "sale", cashier: cashierName,
+      items, subtotal, discount: 0, tax, total,
+      method: "cash", payments: [{ method: "cash", amount: total }],
+      tendered: total, change: 0,
+    };
+    recordTransaction(tx);
+    syncSaleToCloud(tx, total);
+    setReceipt(tx);
+    flash(`Manual sale ${money(total)}`, "ok");
+    setPad(0);
+    resetQtyPad();
+    setPadMode("qty");
   };
 
   /* totals */
@@ -374,7 +539,7 @@ export default function POS() {
     const methods = new Set(payments.map((p) => p.method));
     const tendered = payments.reduce((a, p) => a + (p.given != null ? p.given : p.amount), 0);
     const tx: Transaction = {
-      id: uid(), ts: Date.now(), type: "sale", cashier: cashierName,
+      id: uid(), ts: uniqueTs(), type: "sale", cashier: cashierName,
       items: cart.map((c) => ({ name: c.name, price: c.price, qty: c.qty, taxable: c.taxable, barcode: c.barcode })),
       subtotal: totals.subtotal, discount: totals.discountAmt, tax: totals.tax, total: totals.total,
       method: methods.size > 1 ? "split" : payments[0].method,
@@ -382,40 +547,9 @@ export default function POS() {
       tendered, change: change || 0,
     };
 
-    // 1. Post to Backend
-    if (settings.storeId) {
-      try {
-        const res = await fetch('/api/sales', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            store_id: settings.storeId,
-            date: new Date().toISOString().split('T')[0],
-            amount: totals.total,
-            category: 'POS Sale',
-            payment_method: tx.method === 'split' ? 'other' : (tx.method === 'card' ? 'card' : 'cash'),
-            notes: `POS Transaction ${tx.id} - Cashier: ${tx.cashier}`,
-          })
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          console.error('[POS] Backend sync failed:', err);
-          flash("Cloud sync failed, saved locally", "warn");
-        } else {
-          console.log('[POS] Sale synced to cloud');
-        }
-      } catch (err) {
-        console.error('[POS] Sync error:', err);
-        flash("Network error, saved locally", "warn");
-      }
-    }
-
-    // 2. Update local state
-    setProducts((prev) => prev.map((p) => {
-      const sold = cart.filter((c) => c.barcode === p.barcode && !c.isCustom).reduce((a, c) => a + c.qty, 0);
-      return sold && p.reorder !== 0 ? { ...p, stock: Math.max(0, p.stock - sold) } : p;
-    }));
-    setTransactions((prev) => [tx, ...prev]);
+    recordTransaction(tx);
+    await syncSaleToCloud(tx, totals.total);
+    applyStockChanges(cart);
     setReceipt(tx); setCheckoutOpen(false); resetSale();
   };
 
@@ -426,15 +560,24 @@ export default function POS() {
     const tax = taxable * (settings.taxRate / 100);
     const total = subtotal + tax;
     const tx: Transaction = {
-      id: uid(), ts: Date.now(), type: "refund", cashier: cashierName, refOf: orig.id,
+      id: uid(), ts: uniqueTs(), type: "refund", cashier: cashierName, refOf: orig.id,
       items: returnItems.map((it) => ({ name: it.name, price: it.price, qty: it.qty, taxable: it.taxable, barcode: it.barcode })),
       subtotal: -subtotal, discount: 0, tax: -tax, total: -total, method, tendered: -total, change: 0,
     };
-    setProducts((prev) => prev.map((p) => {
-      const back = returnItems.filter((it) => it.barcode === p.barcode).reduce((a, it) => a + it.qty, 0);
-      return back && p.reorder !== 0 ? { ...p, stock: p.stock + back } : p;
-    }));
-    setTransactions((prev) => [tx, ...prev]);
+    setProducts((prev) => {
+      const next = prev.map((p) => {
+        const back = returnItems.filter((it) => it.barcode === p.barcode).reduce((a, it) => a + it.qty, 0);
+        return back && p.reorder !== 0 ? { ...p, stock: p.stock + back } : p;
+      });
+      if (settings.storeId) {
+        next.forEach((p) => {
+          const back = returnItems.filter((it) => it.barcode === p.barcode).reduce((a, it) => a + it.qty, 0);
+          if (back && p.reorder !== 0) syncProductToCloud(settings.storeId!, p);
+        });
+      }
+      return next;
+    });
+    recordTransaction(tx);
     setReturnsOpen(false); setReceipt(tx);
     flash(`Refunded ${money(total)}`, "ok");
   };
@@ -442,7 +585,8 @@ export default function POS() {
   /* cash drawer movements */
   const addCashMovement = (type: string, amount: number, note: string) => {
     if (amount <= 0 && type !== "nosale") return;
-    setTransactions((prev) => [{ id: uid(), ts: Date.now(), type, total: amount, note: note || "", method: "cash", cashier: cashierName, items: [], subtotal: 0, discount: 0, tax: 0, tendered: amount, change: 0 }, ...prev]);
+    const tx: Transaction = { id: uid(), ts: uniqueTs(), type, total: amount, note: note || "", method: "cash", cashier: cashierName, items: [], subtotal: 0, discount: 0, tax: 0, tendered: amount, change: 0 };
+    recordTransaction(tx);
     flash(type === "nosale" ? "Drawer opened" : type === "paidin" ? `Paid in ${money(amount)}` : `Paid out ${money(amount)}`, "ok");
   };
 
@@ -460,15 +604,63 @@ export default function POS() {
   };
 
   /* product CRUD */
-  const saveProduct = (data: any) => {
-    setProducts((prev) => {
-      const exists = prev.some((p) => p.barcode === data.barcode);
-      if (editing === "new") { if (exists) { flash("Barcode already exists", "warn"); return prev; } return [...prev, data]; }
-      return prev.map((p) => (p.barcode === editing.barcode ? data : p));
-    });
-    setEditing(null); flash("Product saved", "ok");
+  const saveProduct = async (data: Product) => {
+    if (!settings.storeId) { flash("Select a store first", "warn"); return; }
+    const exists = products.some((p) => p.barcode === data.barcode);
+    if (editing === "new" && exists) { flash("Barcode already exists", "warn"); return; }
+    try {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ store_id: settings.storeId, ...data }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Save failed");
+      const fresh = await fetchProductsFromCloud(settings.storeId);
+      setProducts(fresh);
+      setEditing(null);
+      flash("Product saved", "ok");
+    } catch (err) {
+      console.error("[POS] Product save failed:", err);
+      flash("Failed to save product", "warn");
+    }
   };
-  const deleteProduct = (barcode: string) => { if (!window.confirm("Delete this product?")) return; setProducts((prev) => prev.filter((p) => p.barcode !== barcode)); setEditing(null); };
+  const deleteProduct = async (barcode: string) => {
+    if (!window.confirm("Delete this product?")) return;
+    if (!settings.storeId) return;
+    try {
+      const res = await fetch(`/api/products?store_id=${settings.storeId}&barcode=${encodeURIComponent(barcode)}`, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      setProducts((prev) => prev.filter((p) => p.barcode !== barcode));
+      setEditing(null);
+      flash("Product deleted", "ok");
+    } catch (err) {
+      console.error("[POS] Product delete failed:", err);
+      flash("Failed to delete product", "warn");
+    }
+  };
+  const restockProduct = async (barcode: string, amt: number) => {
+    const prod = products.find((p) => p.barcode === barcode);
+    if (!prod || !settings.storeId) return;
+    const updated = { ...prod, stock: prod.stock + amt };
+    try {
+      await syncProductToCloud(settings.storeId, updated);
+      setProducts((prev) => prev.map((p) => (p.barcode === barcode ? updated : p)));
+    } catch (err) {
+      console.error("[POS] Restock failed:", err);
+      flash("Failed to update stock", "warn");
+    }
+  };
+  const toggleQuickProduct = async (barcode: string) => {
+    const prod = products.find((p) => p.barcode === barcode);
+    if (!prod || !settings.storeId) return;
+    const updated = { ...prod, quick: !prod.quick };
+    try {
+      await syncProductToCloud(settings.storeId, updated);
+      setProducts((prev) => prev.map((p) => (p.barcode === barcode ? updated : p)));
+    } catch (err) {
+      console.error("[POS] Quick toggle failed:", err);
+    }
+  };
 
   /* timesheet */
   const clockToggle = (empId: string) => {
@@ -569,6 +761,8 @@ export default function POS() {
             onAdd={handleAddIntent} cart={cart} totals={totals} discount={discount}
             scanInput={scanInput} setScanInput={setScanInput} handleBarcode={handleBarcode} scanRef={scanRef}
             pendingQty={pendingQty} setPendingQty={setPendingQty}
+            qtyBuilding={qtyBuilding} setQtyBuilding={setQtyBuilding}
+            padMode={padMode} setPadMode={setPadMode}
             changeQty={changeQty} removeLine={removeLine} clearCart={clearCart}
             pad={pad} setPad={setPad} addManualItem={addManualItem} padTaxable={padTaxable} setPadTaxable={setPadTaxable}
             onCheckout={() => (cart.length ? setCheckoutOpen(true) : flash("Cart is empty", "warn"))}
@@ -580,8 +774,8 @@ export default function POS() {
         )}
         {view === "inventory" && (
           <InventoryView products={products} lowStock={lowStock} onEdit={setEditing} onNew={() => setEditing("new")}
-            onRestock={(bc: any, amt: any) => setProducts((prev) => prev.map((p) => (p.barcode === bc ? { ...p, stock: p.stock + amt } : p)))}
-            onToggleQuick={(bc: any) => setProducts((prev) => prev.map((p) => (p.barcode === bc ? { ...p, quick: !p.quick } : p)))} />
+            onRestock={restockProduct}
+            onToggleQuick={toggleQuickProduct} />
         )}
         {view === "staff" && (
           <StaffView employees={employees} setEmployees={setEmployees} timesheet={timesheet} clockToggle={clockToggle}
@@ -602,7 +796,7 @@ export default function POS() {
       {returnsOpen && <ReturnsModal transactions={transactions} taxRate={settings.taxRate} onClose={() => setReturnsOpen(false)} onRefund={processRefund} />}
       {ageVerify && (
         <AgeVerifyModal product={ageVerify.prod}
-          onConfirm={() => { addProductToCart(ageVerify.prod, ageVerify.qty); setAgeOk(true); setPendingQty(1); setAgeVerify(null); }}
+          onConfirm={() => { addProductToCart(ageVerify.prod, ageVerify.qty); setAgeOk(true); resetQtyPad(); setAgeVerify(null); }}
           onDeny={() => { setAgeVerify(null); flash("Sale of age-restricted item denied", "warn"); }} />
       )}
       {receipt && <ReceiptModal data={receipt} storeName={settings.storeName} onClose={() => setReceipt(null)} />}
@@ -638,13 +832,71 @@ function CentsPad({ setValue, big }: any) {
   );
 }
 
+function RegisterPad({ mode, setMode, pendingQty, setPendingQty, qtyBuilding, setQtyBuilding, pad, setPad }: any) {
+  const cls = "rounded-lg bg-slate-100 hover:bg-slate-200 font-bold py-2.5 text-base";
+  const modeBtn = (m: string, label: string) => (
+    <button onClick={() => { setMode(m); if (m === "qty") setPad(0); else setQtyBuilding(false); }}
+      className="flex-1 py-1 rounded-md text-xs font-bold"
+      style={mode === m ? { background: "#14181f", color: "white" } : { background: "#f1f5f9", color: "#64748b" }}>{label}</button>
+  );
+
+  const pressDigit = (n: number) => {
+    if (mode === "qty") {
+      setPendingQty((q: number) => {
+        const next = qtyBuilding ? Math.min(999, q * 10 + n) : n;
+        return Math.max(1, next);
+      });
+      setQtyBuilding(true);
+    } else {
+      setPad((v: number) => Math.min(v * 10 + n, 99999999));
+    }
+  };
+
+  const pressDoubleZero = () => {
+    if (mode === "qty") pressDigit(0);
+    else setPad((v: number) => Math.min(v * 100, 99999999));
+  };
+
+  const back = () => {
+    if (mode === "qty") {
+      setPendingQty((q: number) => {
+        const next = Math.floor(q / 10);
+        if (next < 1) { setQtyBuilding(false); return 1; }
+        return next;
+      });
+    } else {
+      setPad((v: number) => Math.floor(v / 10));
+    }
+  };
+
+  const clear = () => {
+    if (mode === "qty") { setPendingQty(1); setQtyBuilding(false); }
+    else setPad(0);
+  };
+
+  return (
+    <div>
+      <div className="flex gap-1 mb-1.5">{modeBtn("qty", "QTY")}{modeBtn("price", "$ AMT")}</div>
+      <div className="grid grid-cols-3 gap-1.5">
+        {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => <button key={n} onClick={() => pressDigit(n)} className={cls}>{n}</button>)}
+        <button onClick={pressDoubleZero} className={cls}>00</button>
+        <button onClick={() => pressDigit(0)} className={cls}>0</button>
+        <button onClick={back} className={cls + " flex items-center justify-center"}><Delete size={18} /></button>
+      </div>
+      <button onClick={clear} className="w-full mt-1.5 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-500">Clear</button>
+    </div>
+  );
+}
+
 /* ================================================================== */
 /*  Register                                                           */
 /* ================================================================== */
 function RegisterView(props: any) {
   const {
     quickItems, filtered, categories, activeCat, setActiveCat, search, setSearch, onAdd, cart, totals, discount,
-    scanInput, setScanInput, handleBarcode, scanRef, pendingQty, setPendingQty, changeQty, removeLine, clearCart,
+    scanInput, setScanInput, handleBarcode, scanRef, pendingQty, setPendingQty,
+    qtyBuilding, setQtyBuilding, padMode, setPadMode,
+    changeQty, removeLine, clearCart,
     pad, setPad, addManualItem, padTaxable, setPadTaxable, onCheckout, onDiscount, onClearDiscount, onReturns,
     held, onHold, onResume,
   } = props;
@@ -678,7 +930,7 @@ function RegisterView(props: any) {
             <button onClick={() => setPendingQty((q: any) => Math.min(999, q + 1))} className="w-8 h-8 rounded-md bg-slate-100 hover:bg-slate-200 flex items-center justify-center"><Plus size={15} /></button>
           </div>
         </div>
-        {pendingQty > 1 && (
+        {pendingQty > 1 && padMode === "qty" && (
           <div className="-mt-1 text-xs font-semibold flex items-center gap-1" style={{ color: "#d97706" }}>
             <Hash size={12} /> Next item will be added ×{pendingQty}. Scan or tap it now.
           </div>
@@ -743,18 +995,31 @@ function RegisterView(props: any) {
           ))}
         </div>
 
-        {/* manual entry */}
+        {/* numpad: QTY mode (type qty then scan) or $ AMT mode (manual entry) */}
         <div className="border-t border-slate-100 px-3 pt-2 pb-1">
           <div className="flex items-center justify-between mb-1.5">
-            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400"><Hash size={13} /> Manual Entry</div>
-            <label className="flex items-center gap-1 text-xs text-slate-500 cursor-pointer"><input type="checkbox" checked={padTaxable} onChange={(e) => setPadTaxable(e.target.checked)} /> Taxable</label>
+            <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-400">
+              <Hash size={13} /> {padMode === "qty" ? "Quantity (then scan)" : "Manual Entry"}
+            </div>
+            {padMode === "price" && (
+              <label className="flex items-center gap-1 text-xs text-slate-500 cursor-pointer"><input type="checkbox" checked={padTaxable} onChange={(e) => setPadTaxable(e.target.checked)} /> Taxable</label>
+            )}
           </div>
           <div className="flex gap-2">
-            <div className="flex-1"><CentsPad setValue={setPad} /></div>
+            <div className="flex-1">
+              <RegisterPad mode={padMode} setMode={setPadMode} pendingQty={pendingQty} setPendingQty={setPendingQty}
+                qtyBuilding={qtyBuilding} setQtyBuilding={setQtyBuilding} pad={pad} setPad={setPad} />
+            </div>
             <div className="flex flex-col gap-1.5" style={{ width: 110 }}>
-              <div className="flex-1 flex flex-col items-end justify-center px-2 rounded-lg font-mono font-bold text-xl" style={{ background: "#0f1115", color: "#34d399" }}>{money(pad / 100)}</div>
-              <button onClick={() => setPad(0)} className="py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-xs font-semibold">Clear</button>
-              <button onClick={addManualItem} className="py-2 rounded-lg font-semibold text-white text-sm" style={{ background: "#14181f" }}>Add</button>
+              <div className="flex-1 flex flex-col items-end justify-center px-2 rounded-lg font-mono font-bold text-xl" style={{ background: "#0f1115", color: padMode === "qty" ? "#fbbf24" : "#34d399" }}>
+                {padMode === "qty" ? (pendingQty > 1 || qtyBuilding ? `×${pendingQty}` : "×1") : money(pad / 100)}
+              </div>
+              {padMode === "price" && (
+                <button onClick={addManualItem} className="py-2 rounded-lg font-semibold text-white text-sm" style={{ background: "#14181f" }}>Ring Sale</button>
+              )}
+              {padMode === "qty" && (
+                <div className="text-[10px] text-slate-400 text-center leading-tight">Type qty, then scan or tap item</div>
+              )}
             </div>
           </div>
         </div>

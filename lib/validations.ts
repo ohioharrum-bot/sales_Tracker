@@ -9,7 +9,7 @@ export const storeSchema = z.object({
 export const saleSchema = z.object({
   store_id: z.string().uuid(),
   date: z.string().min(1, 'Date is required'),
-  amount: z.coerce.number().min(0.01, 'Amount must be greater than 0'),
+  amount: z.coerce.number().min(0.001, 'Amount must be greater than 0'),
   category: z.string().min(1, 'Category is required'),
   payment_method: z.enum(['cash', 'card', 'transfer', 'other']),
   notes: z.string().optional(),
@@ -62,3 +62,24 @@ export type PayoutInput  = z.infer<typeof payoutSchema>
 export type ExpenseInput = z.infer<typeof expenseSchema>
 export type DailyLedgerInput       = z.infer<typeof dailyLedgerSchema>
 export type DistributorPurchaseInput = z.infer<typeof distributorPurchaseSchema>
+
+export const posProductSchema = z.object({
+  store_id: z.string().uuid(),
+  barcode: z.string().min(1, 'Barcode is required'),
+  name: z.string().min(1, 'Name is required'),
+  price: z.coerce.number().min(0),
+  cost: z.coerce.number().min(0).default(0),
+  stock: z.coerce.number().int().default(0),
+  cat: z.string().min(1).default('Other'),
+  quick: z.boolean().default(false),
+  taxable: z.boolean().default(true),
+  reorder: z.coerce.number().int().default(0),
+})
+
+export const posTransactionSchema = z.object({
+  store_id: z.string().uuid(),
+  id: z.string().min(1),
+  ts: z.coerce.number(),
+  type: z.string().min(1),
+  data: z.record(z.string(), z.any()),
+})
